@@ -26,7 +26,7 @@ except ImportError:
 app = FastAPI(title="BassLift", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-VERSION = "3.2.0"
+VERSION = "0.1.0"
 
 BASS_FREQ_MIN = 30.0
 BASS_FREQ_MAX = 262.0   # do C4 — łapie grę wysoko na gryfie
