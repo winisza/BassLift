@@ -11,13 +11,11 @@ Local audio tool that does two things:
 
 Everything runs locally on your machine. No audio is ever uploaded to a third-party server.
 
-> **Warning**
-> This project is **experimental** — not even beta. Expect breaking changes, rough edges, and incomplete features. Use at your own risk.
+> ⚠️ **Experimental** — this is a personal project in active development. Expect rough edges, breaking changes, and quirky behavior on edge cases. Feedback and issues welcome.
+>
+> 🚀 **Best on modern GPU or Apple Silicon.** Demucs separation is the heaviest step — a 3-minute song takes ~5-30 seconds on an NVIDIA GPU (CUDA) or Apple Silicon (M1/M2/M3/M4 via MPS), versus 2-4 minutes on CPU. See [GPU acceleration](#gpu-acceleration-strongly-recommended) below.
 
-> **Hardware note**
-> BassLift works best on machines with a modern GPU (NVIDIA with CUDA support) or Apple Silicon (M1/M2/M3/M4). CPU-only mode works but source separation will be significantly slower.
-
-![Status](https://img.shields.io/badge/status-experimental-red)
+![Status](https://img.shields.io/badge/status-experimental-orange)
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -31,10 +29,39 @@ Everything runs locally on your machine. No audio is ever uploaded to a third-pa
 ## Requirements
 
 - Python 3.9+
-- ~4 GB RAM
+- ~4 GB RAM (CPU mode) or ~2 GB VRAM (GPU mode)
 - ~500 MB disk for Demucs model weights (downloaded on first run)
 - A modern browser (Chrome, Firefox, Edge, Safari)
-- **Recommended:** a modern GPU (NVIDIA with CUDA) or Apple Silicon for reasonable processing times
+
+### GPU acceleration (strongly recommended)
+
+Demucs is built on PyTorch and automatically uses your GPU if available. Without GPU acceleration, separating a 3-minute song takes 2–4 minutes on CPU; with GPU it takes 5–30 seconds.
+
+**NVIDIA (CUDA)** — install PyTorch with CUDA support *before* installing the rest. Pick the right CUDA version for your driver at <https://pytorch.org/get-started/locally/>. Example for CUDA 12.1:
+
+```bash
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+Then install the other dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Verify GPU is detected:
+
+```bash
+python -c "import torch; print('CUDA:', torch.cuda.is_available(), '| Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+**Apple Silicon (M1/M2/M3/M4)** — PyTorch's MPS (Metal Performance Shaders) backend is included by default. Just run `pip install -r requirements.txt` and it works. Verify:
+
+```bash
+python -c "import torch; print('MPS:', torch.backends.mps.is_available())"
+```
+
+**CPU only** — works everywhere, no extra setup. Just slower.
 
 ## Quick start
 
@@ -110,7 +137,3 @@ MIT — see [LICENSE](LICENSE).
 - [Demucs](https://github.com/facebookresearch/demucs) by Meta AI Research
 - [librosa](https://librosa.org/) for audio analysis
 - [FastAPI](https://fastapi.tiangolo.com/) for the backend
-
-## Vibe-coded
-
-This entire application was vibe-coded with [Claude](https://claude.ai/) Opus 4.6/4.7 — from architecture decisions through implementation to this very README.
