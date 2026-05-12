@@ -11,7 +11,13 @@ Local audio tool that does two things:
 
 Everything runs locally on your machine. No audio is ever uploaded to a third-party server.
 
-![Status](https://img.shields.io/badge/status-beta-orange)
+> **Warning**
+> This project is **experimental** — not even beta. Expect breaking changes, rough edges, and incomplete features. Use at your own risk.
+
+> **Hardware note**
+> BassLift works best on machines with a modern GPU (NVIDIA with CUDA support) or Apple Silicon (M1/M2/M3/M4). CPU-only mode works but source separation will be significantly slower.
+
+![Status](https://img.shields.io/badge/status-experimental-red)
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -28,6 +34,7 @@ Everything runs locally on your machine. No audio is ever uploaded to a third-pa
 - ~4 GB RAM
 - ~500 MB disk for Demucs model weights (downloaded on first run)
 - A modern browser (Chrome, Firefox, Edge, Safari)
+- **Recommended:** a modern GPU (NVIDIA with CUDA) or Apple Silicon for reasonable processing times
 
 ## Quick start
 
