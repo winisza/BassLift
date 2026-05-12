@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BassLift — Bass Tab Extractor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Boldonse&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #111520;
+    --bg2: #171c2b;
+    --bg3: #1e2436;
+    --border: #2a3148;
+    --border2: #384160;
+    --accent: #c0956c;
+    --accent2: #7fa8b8;
+    --text: #e4e2de;
+    --text2: #918e88;
+    --text3: #5e5f66;
+    --red: #d4605c;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    padding: 2rem 2.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+  }
+
+  .logo {
+    font-family: 'Boldonse', 'Impact', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .logo span { color: var(--text3); }
+
+  .tagline {
+    font-size: 0.8rem;
+    color: var(--text3);
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+    opacity: 0.7;
+  }
+
+  main {
+    width: 100%;
+    max-width: 860px;
+    padding: 2.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Upload area */
+  .upload-area {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: rgba(192,149,108,0.04); }
+  .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .upload-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 1rem;
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+  }
+
+  .upload-title { font-size: 1rem; font-weight: 500; margin-bottom: 0.4rem; }
+  .upload-sub { font-size: 0.8rem; color: var(--text3); }
+
+  .file-chosen {
+    display: none;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+  }
+  .file-chosen.show { display: flex; }
+  .file-icon { font-size: 1.5rem; }
+  .file-name { font-family: var(--mono); font-size: 0.85rem; color: var(--text); flex: 1; }
+  .file-size { font-size: 0.75rem; color: var(--text3); }
+  .file-remove {
+    background: none; border: none; color: var(--text3); cursor: pointer;
+    font-size: 1.1rem; padding: 4px; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .file-remove:hover { color: var(--red); }
+
+  /* Settings */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 540px) { .settings-grid { grid-template-columns: 1fr; } }
+
+  .setting-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+  }
+
+  .setting-name {
+    font-size: 0.8rem;
+    color: var(--text2);
+    margin-bottom: 0.6rem;
+    font-weight: 500;
+  }
+
+  select, input[type=number] {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  select:focus, input[type=number]:focus { border-color: var(--accent); }
+
+  .tuning-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .tuning-row input {
+    width: 52px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .tuning-label { font-size: 0.7rem; color: var(--text3); font-family: var(--mono); }
+
+  /* Backend status */
+  .backend-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text3);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.ok { background: var(--accent); box-shadow: 0 0 6px rgba(192,149,108,0.4); }
+  .status-dot.err { background: var(--red); }
+  .status-text { color: var(--text2); flex: 1; }
+  .backend-url-input {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 4px 8px;
+    width: 200px;
+    outline: none;
+  }
+  .check-btn {
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .check-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Run button */
+  .run-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--accent);
+    color: #111520;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    text-transform: uppercase;
+  }
+  .run-btn:hover:not(:disabled) { opacity: 0.88; }
+  .run-btn:active:not(:disabled) { transform: scale(0.99); }
+  .run-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Progress */
+  .progress-area {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .progress-area.show { display: flex; }
+
+  .step-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  .step.active { background: var(--bg3); }
+  .step.done { opacity: 0.6; }
+  .step.err { background: rgba(212,96,92,0.08); }
+
+  .step-icon {
+    font-size: 0.9rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    font-family: var(--mono);
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-bar-wrap {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  /* Tab output */
+  .tab-output { display: none; flex-direction: column; gap: 1.25rem; }
+  .tab-output.show { display: flex; }
+
+  .tab-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .meta-pill {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .meta-pill.hi { border-color: var(--accent); color: var(--accent); }
+
+  .tab-scroll {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    padding: 1.5rem;
+  }
+
+  .tab-pre {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .tab-pre .string-label { color: var(--text3); }
+  .tab-pre .fret { color: var(--accent); }
+  .tab-pre .open { color: var(--accent2); }
+  .tab-pre .bar { color: var(--border2); }
+
+  .action-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Error */
+  .error-box {
+    display: none;
+    background: rgba(212,96,92,0.08);
+    border: 1px solid rgba(212,96,92,0.25);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--red);
+    font-family: var(--mono);
+  }
+  .error-box.show { display: block; }
+
+  /* Instructions panel */
+  .instructions {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .instructions-header {
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text2);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .instructions-header:hover { color: var(--text); }
+  .instructions-body {
+    padding: 1.25rem;
+    display: none;
+  }
+  .instructions-body.show { display: block; }
+
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--accent2);
+    margin: 0.6rem 0 1rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .inst-step {
+    font-size: 0.82rem;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-bottom: 0.3rem;
+  }
+  .inst-step strong { color: var(--accent); font-weight: 500; }
+
+  /* Language switcher */
+  .lang-switch {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-left: 1rem;
+  }
+  .lang-btn {
+    background: transparent;
+    border: none;
+    padding: 0.35rem 0.7rem;
+    font: 0.7rem var(--mono);
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .lang-btn.active {
+    background: var(--bg3);
+    color: var(--accent);
+  }
+  .lang-btn:hover:not(.active) { color: var(--text2); }
+
+  /* Mode tabs */
+  .mode-tabs {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+    padding: 0.3rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .mode-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0.85rem 1rem;
+    font: 0.82rem/1.3 var(--sans);
+    color: var(--text2);
+    cursor: pointer;
+    border-radius: 7px;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .mode-tab:hover { color: var(--text); background: var(--bg3); }
+  .mode-tab.active {
+    background: var(--bg3);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border2);
+  }
+  .mode-tab .mode-title {
+    display: block;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.15rem;
+  }
+  .mode-tab.active .mode-title { color: var(--accent); }
+  .mode-tab .mode-desc {
+    font-size: 0.7rem;
+    color: var(--text3);
+  }
+
+  /* Slider */
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--bg3);
+    border: none;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    padding: 0;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+  .slider::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  /* Checkbox */
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.84rem;
+    color: var(--text2);
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-row input { display: none; }
+  .checkmark {
+    width: 18px; height: 18px;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    background: var(--bg3);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+    font-size: 0.7rem;
+  }
+  .checkbox-row input:checked + .checkmark {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .checkbox-row input:checked + .checkmark::after {
+    content: '✓';
+    color: var(--bg);
+    font-weight: 700;
+  }
+
+  footer {
+    margin-top: auto;
+    padding: 1.5rem;
+    font-size: 0.72rem;
+    color: var(--text3);
+    font-family: var(--mono);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Bass<span>/</span>Lift</div>
+  <div class="tagline" data-i18n="tagline">Audio → Bass → Tab</div>
+  <div class="badge">BETA</div>
+  <div class="lang-switch">
+    <button class="lang-btn active" data-lang="pl">PL</button>
+    <button class="lang-btn" data-lang="en">EN</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Mode tabs -->
+  <div class="mode-tabs" role="tablist">
+    <button class="mode-tab active" data-mode="bass">
+      <span class="mode-title" data-i18n="mode_bass_title">Bass → Tabulatura</span>
+      <span class="mode-desc" data-i18n="mode_bass_desc">Ekstrakcja basu, transkrypcja, MIDI</span>
+    </button>
+    <button class="mode-tab" data-mode="vocal">
+      <span class="mode-title" data-i18n="mode_vocal_title">Wokal + Instrumental</span>
+      <span class="mode-desc" data-i18n="mode_vocal_desc">Rozdziel piosenkę na 2 ścieżki WAV</span>
+    </button>
+  </div>
+
+  <!-- Upload -->
+  <div>
+    <div class="section-label" data-i18n="sec_upload">01 — Plik audio</div>
+    <div class="upload-area" id="uploadArea">
+      <input type="file" id="fileInput" accept="audio/*" />
+      <div class="upload-icon">♪</div>
+      <div class="upload-title" data-i18n="upload_title">Upuść plik audio tutaj</div>
+      <div class="upload-sub" data-i18n="upload_sub">MP3, WAV, FLAC, OGG · max 50 MB</div>
+    </div>
+    <div class="file-chosen" id="fileChosen">
+      <div class="file-icon">🎵</div>
+      <div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-size" id="fileSize">—</div>
+      </div>
+      <button class="file-remove" id="fileRemove" title="Usuń">✕</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div>
+    <div class="section-label" data-i18n="sec_settings">02 — Ustawienia</div>
+    <div class="settings-grid">
+      <div class="setting-card">
+        <div class="setting-name" data-i18n="set_model">Model separacji (Demucs)</div>
+        <select id="demucsModel">
+          <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (zalecany)</option>
+          <option value="htdemucs_ft" data-i18n="model_htdemucs_ft">htdemucs_ft (fine-tuned)</option>
+          <option value="mdx_extra" data-i18n="model_mdx">mdx_extra (wolniejszy)</option>
+        </select>
+      </div>
+      <div class="setting-card mode-bass-only">
+        <div class="setting-name"><span data-i18n="set_threshold">Próg pewności detekcji</span>: <span id="thresholdVal">40</span></div>
+        <input type="range" id="noteThreshold" value="40" min="0" max="127" class="slider" />
+        <div style="font-size:0.68rem;color:var(--text3);margin-top:0.4rem;display:flex;justify-content:space-between"><span data-i18n="set_threshold_low">← więcej nut</span><span data-i18n="set_threshold_high">tylko pewne →</span></div>
+      </div>
+      <div class="setting-card mode-bass-only">
+        <div class="setting-name" data-i18n="set_tuning">Strój basu</div>
+        <div class="tuning-row">
+          <span class="tuning-label">E:</span><input type="text" id="t1" value="E" />
+          <span class="tuning-label">A:</span><input type="text" id="t2" value="A" />
+          <span class="tuning-label">D:</span><input type="text" id="t3" value="D" />
+          <span class="tuning-label">G:</span><input type="text" id="t4" value="G" />
+        </div>
+      </div>
+      <div class="setting-card mode-bass-only">
+        <label class="checkbox-row">
+          <input type="checkbox" id="exportMidi" />
+          <span class="checkmark"></span>
+          <span data-i18n="set_export_midi">Eksportuj MIDI</span>
+        </label>
+        <label class="checkbox-row" style="margin-top:0.7rem">
+          <input type="checkbox" id="exportBass" />
+          <span class="checkmark"></span>
+          <span data-i18n="set_export_bass">Pobierz izolowany bas (WAV)</span>
+        </label>
+      </div>
+      <div class="setting-card mode-bass-only">
+        <div class="setting-name" data-i18n="set_quantize">Siatka kwantyzacji</div>
+        <select id="quantizeMode">
+          <option value="8" data-i18n="quant_8">1/8 (ósemki)</option>
+          <option value="8t" data-i18n="quant_8t">1/8T (triole ósemkowe)</option>
+          <option value="16" selected data-i18n="quant_16">1/16 (szesnastki)</option>
+          <option value="16t" data-i18n="quant_16t">1/16T (triole szesnastkowe)</option>
+        </select>
+      </div>
+      <div class="setting-card mode-vocal-only" style="display:none">
+        <div class="setting-name" data-i18n="set_stem">Co wyciągnąć</div>
+        <select id="stemSelect">
+          <option value="vocals" data-i18n="stem_vocals">Wokal (i instrumental)</option>
+          <option value="drums" data-i18n="stem_drums">Perkusja (i reszta)</option>
+          <option value="bass" data-i18n="stem_bass">Bas (i reszta)</option>
+          <option value="other" data-i18n="stem_other">Inne (i reszta)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backend -->
+  <div>
+    <div class="section-label" data-i18n="sec_backend">03 — Połączenie z backendem</div>
+    <div class="backend-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText" data-i18n="status_idle">Nie sprawdzono</span>
+      <input class="backend-url-input" id="backendUrl" value="http://localhost:8000" />
+      <button class="check-btn" id="checkBtn" data-i18n="btn_check">Sprawdź</button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Run -->
+  <button class="run-btn" id="runBtn" disabled data-i18n="btn_run_bass">▶ Uruchom ekstrakcję</button>
+
+  <!-- Progress -->
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="step-list" id="stepList"></div>
+  </div>
+
+  <!-- Tab output -->
+  <div class="tab-output" id="tabOutput">
+    <div class="tab-meta" id="tabMeta"></div>
+    <div class="tab-scroll mode-bass-only">
+      <pre class="tab-pre" id="tabPre"></pre>
+    </div>
+    <div class="action-row">
+      <button class="action-btn mode-bass-only" id="copyBtn" data-i18n="btn_copy">Kopiuj tabulaturę</button>
+      <button class="action-btn mode-bass-only" id="downloadTabBtn" data-i18n="btn_download_tab">Pobierz .txt</button>
+      <button class="action-btn" id="downloadMidiBtn" style="display:none" data-i18n="btn_download_midi">Pobierz MIDI</button>
+      <button class="action-btn" id="downloadBassBtn" style="display:none" data-i18n="btn_download_bass">Pobierz bas (WAV)</button>
+      <button class="action-btn" id="downloadTargetBtn" style="display:none">Pobierz</button>
+      <button class="action-btn" id="downloadAccompBtn" style="display:none">Pobierz</button>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <div class="instructions-header" id="instToggle">
+      <span style="color:var(--accent)">?</span> <span data-i18n="inst_header">Jak uruchomić backend lokalnie</span>
+      <span id="instArrow" style="margin-left:auto">▼</span>
+    </div>
+    <div class="instructions-body" id="instBody">
+      <div class="inst-step"><strong data-i18n="inst_req">Wymagania:</strong> <span data-i18n="inst_req_desc">Python 3.9+, pip, ok. 4 GB RAM</span></div>
+      <br>
+      <div class="inst-step"><strong>1. <span data-i18n="inst_step1">Instalacja zależności</span></strong></div>
+      <div class="code-block">pip install fastapi uvicorn python-multipart \
+    demucs librosa midiutil python-dotenv</div>
+
+      <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Uruchomienie serwera</span></strong></div>
+      <div class="code-block">uvicorn server:app --reload --port 8000</div>
+
+      <div class="inst-step"><strong>3. <span data-i18n="inst_step3">Pobierz kod serwera</span></strong> — <span data-i18n="inst_step3_desc">plik <span style="color:var(--accent)">server.py</span> jest dostępny w repozytorium GitHub.</span></div>
+      <br>
+      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie pobiera model Demucs (~300 MB). Kolejne są szybsze.</div>
+    </div>
+  </div>
+
+</main>
+
+<footer data-i18n="footer">BassLift · działa lokalnie · dane nie opuszczają Twojego komputera</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let selectedFile = null;
+let tabData = null;
+let midiBlob = null;
+let currentMode = 'bass';   // 'bass' | 'vocal'
+let currentLang = 'pl';
+
+// ─── i18n ───
+const I18N = {
+  pl: {
+    tagline: 'Audio → Bass → Tab',
+    mode_bass_title: 'Bass → Tabulatura',
+    mode_bass_desc: 'Ekstrakcja basu, transkrypcja, MIDI',
+    mode_vocal_title: 'Wokal + Instrumental',
+    mode_vocal_desc: 'Rozdziel piosenkę na 2 ścieżki WAV',
+    sec_upload: '01 — Plik audio',
+    upload_title: 'Upuść plik audio tutaj',
+    upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
+    sec_settings: '02 — Ustawienia',
+    set_model: 'Model separacji (Demucs)',
+    model_htdemucs: 'htdemucs (zalecany)',
+    model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
+    model_mdx: 'mdx_extra (wolniejszy)',
+    set_threshold: 'Próg pewności detekcji',
+    set_threshold_low: '← więcej nut',
+    set_threshold_high: 'tylko pewne →',
+    set_tuning: 'Strój basu',
+    set_export_midi: 'Eksportuj MIDI',
+    set_export_bass: 'Pobierz izolowany bas (WAV)',
+    set_quantize: 'Siatka kwantyzacji',
+    quant_8: '1/8 (ósemki)',
+    quant_8t: '1/8T (triole ósemkowe)',
+    quant_16: '1/16 (szesnastki)',
+    quant_16t: '1/16T (triole szesnastkowe)',
+    set_stem: 'Co wyciągnąć',
+    stem_vocals: 'Wokal (i instrumental)',
+    stem_drums: 'Perkusja (i reszta)',
+    stem_bass: 'Bas (i reszta)',
+    stem_other: 'Inne (i reszta)',
+    sec_backend: '03 — Połączenie z backendem',
+    status_idle: 'Nie sprawdzono',
+    status_ok: 'Połączenie OK',
+    status_err: 'Brak połączenia',
+    btn_check: 'Sprawdź',
+    btn_run_bass: '▶ Uruchom ekstrakcję',
+    btn_run_vocal: '▶ Rozdziel piosenkę',
+    btn_copy: 'Kopiuj tabulaturę',
+    btn_copied: 'Skopiowano!',
+    btn_download_tab: 'Pobierz .txt',
+    btn_download_midi: 'Pobierz MIDI',
+    btn_download_bass: 'Pobierz bas (WAV)',
+    inst_header: 'Jak uruchomić backend lokalnie',
+    inst_req: 'Wymagania:',
+    inst_req_desc: 'Python 3.9+, pip, ok. 4 GB RAM',
+    inst_step1: 'Instalacja zależności',
+    inst_step2: 'Uruchomienie serwera',
+    inst_step3: 'Pobierz kod serwera',
+    inst_step3_desc: 'plik server.py jest dostępny w repozytorium GitHub.',
+    inst_note: 'Pierwsze uruchomienie pobiera model Demucs (~300 MB). Kolejne są szybsze.',
+    footer: 'BassLift · działa lokalnie · dane nie opuszczają Twojego komputera',
+    step_sep: 'Separacja basu (Demucs)',
+    step_sep_vocal: 'Separacja źródeł (Demucs)',
+    step_midi: 'Transkrypcja audio → nuty (librosa pyin)',
+    step_tab: 'Generowanie tabulatury',
+    meta_bpm: 'BPM: ',
+    meta_notes: 'Nuty: ',
+    meta_dur: 'Czas: ',
+    meta_tuning: 'Strój: ',
+    meta_grid: 'Siatka: ',
+    err_prefix: 'Błąd: ',
+    err_no_file: 'Wybierz plik',
+    err_no_backend: 'Sprawdź najpierw połączenie z backendem',
+    err_unknown: 'Nieznany błąd serwera',
+    label_target: 'Pobierz {x}',
+    label_accomp: 'Pobierz {x}',
+    name_vocals: 'wokal',
+    name_drums: 'perkusję',
+    name_bass: 'bas',
+    name_other: 'inne',
+    name_instrumental: 'instrumental',
+    name_no_bass: 'resztę (bez basu)',
+    name_no_drums: 'resztę (bez perkusji)',
+    name_no_other: 'resztę',
+  },
+  en: {
+    tagline: 'Audio → Bass → Tab',
+    mode_bass_title: 'Bass → Tablature',
+    mode_bass_desc: 'Bass extraction, transcription, MIDI',
+    mode_vocal_title: 'Vocals + Instrumental',
+    mode_vocal_desc: 'Split a song into 2 WAV stems',
+    sec_upload: '01 — Audio file',
+    upload_title: 'Drop your audio file here',
+    upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
+    sec_settings: '02 — Settings',
+    set_model: 'Separation model (Demucs)',
+    model_htdemucs: 'htdemucs (recommended)',
+    model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
+    model_mdx: 'mdx_extra (slower)',
+    set_threshold: 'Detection confidence threshold',
+    set_threshold_low: '← more notes',
+    set_threshold_high: 'confident only →',
+    set_tuning: 'Bass tuning',
+    set_export_midi: 'Export MIDI',
+    set_export_bass: 'Download isolated bass (WAV)',
+    set_quantize: 'Quantization grid',
+    quant_8: '1/8 (eighth notes)',
+    quant_8t: '1/8T (eighth triplets)',
+    quant_16: '1/16 (sixteenth notes)',
+    quant_16t: '1/16T (sixteenth triplets)',
+    set_stem: 'What to extract',
+    stem_vocals: 'Vocals (and instrumental)',
+    stem_drums: 'Drums (and the rest)',
+    stem_bass: 'Bass (and the rest)',
+    stem_other: 'Other (and the rest)',
+    sec_backend: '03 — Backend connection',
+    status_idle: 'Not checked',
+    status_ok: 'Connection OK',
+    status_err: 'No connection',
+    btn_check: 'Check',
+    btn_run_bass: '▶ Run extraction',
+    btn_run_vocal: '▶ Split the song',
+    btn_copy: 'Copy tablature',
+    btn_copied: 'Copied!',
+    btn_download_tab: 'Download .txt',
+    btn_download_midi: 'Download MIDI',
+    btn_download_bass: 'Download bass (WAV)',
+    inst_header: 'How to run the backend locally',
+    inst_req: 'Requirements:',
+    inst_req_desc: 'Python 3.9+, pip, ~4 GB RAM',
+    inst_step1: 'Install dependencies',
+    inst_step2: 'Start the server',
+    inst_step3: 'Get the server code',
+    inst_step3_desc: 'the server.py file is available in the GitHub repository.',
+    inst_note: 'First run downloads the Demucs model (~300 MB). Subsequent runs are faster.',
+    footer: 'BassLift · runs locally · your data never leaves your computer',
+    step_sep: 'Bass separation (Demucs)',
+    step_sep_vocal: 'Source separation (Demucs)',
+    step_midi: 'Audio → notes transcription (librosa pyin)',
+    step_tab: 'Generating tablature',
+    meta_bpm: 'BPM: ',
+    meta_notes: 'Notes: ',
+    meta_dur: 'Duration: ',
+    meta_tuning: 'Tuning: ',
+    meta_grid: 'Grid: ',
+    err_prefix: 'Error: ',
+    err_no_file: 'Choose a file first',
+    err_no_backend: 'Check backend connection first',
+    err_unknown: 'Unknown server error',
+    label_target: 'Download {x}',
+    label_accomp: 'Download {x}',
+    name_vocals: 'vocals',
+    name_drums: 'drums',
+    name_bass: 'bass',
+    name_other: 'other',
+    name_instrumental: 'instrumental',
+    name_no_bass: 'rest (no bass)',
+    name_no_drums: 'rest (no drums)',
+    name_no_other: 'rest',
+  },
+};
+
+const t = key => I18N[currentLang][key] || I18N.pl[key] || key;
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.documentElement.lang = currentLang;
+  // Update run button label depending on mode
+  $('runBtn').textContent = t(currentMode === 'bass' ? 'btn_run_bass' : 'btn_run_vocal');
+}
+
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b === btn));
+    currentLang = btn.dataset.lang;
+    try { localStorage.setItem('basslift_lang', currentLang); } catch {}
+    applyLang();
+  });
+});
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t === tab));
+    currentMode = tab.dataset.mode;
+    try { localStorage.setItem('basslift_mode', currentMode); } catch {}
+    applyMode();
+  });
+});
+
+function applyMode() {
+  const isBass = currentMode === 'bass';
+  document.querySelectorAll('.mode-bass-only').forEach(el => {
+    el.style.display = isBass ? '' : 'none';
+  });
+  document.querySelectorAll('.mode-vocal-only').forEach(el => {
+    el.style.display = isBass ? 'none' : '';
+  });
+  // Hide tab output if mode changes
+  $('tabOutput').classList.remove('show');
+  applyLang();
+}
+
+// Restore preferences
+try {
+  const savedLang = localStorage.getItem('basslift_lang');
+  if (savedLang && I18N[savedLang]) {
+    currentLang = savedLang;
+    document.querySelectorAll('.lang-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.lang === currentLang));
+  }
+  const savedMode = localStorage.getItem('basslift_mode');
+  if (savedMode === 'vocal' || savedMode === 'bass') {
+    currentMode = savedMode;
+    document.querySelectorAll('.mode-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.mode === currentMode));
+  }
+} catch {}
+applyMode();
+applyLang();
+
+// File upload
+const uploadArea = $('uploadArea');
+const fileInput = $('fileInput');
+const fileChosen = $('fileChosen');
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+
+function setFile(f) {
+  selectedFile = f;
+  $('fileName').textContent = f.name;
+  $('fileSize').textContent = (f.size / 1048576).toFixed(2) + ' MB';
+  uploadArea.style.display = 'none';
+  fileChosen.classList.add('show');
+  checkRunnable();
+}
+
+$('fileRemove').addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  uploadArea.style.display = '';
+  fileChosen.classList.remove('show');
+  checkRunnable();
+});
+
+// Backend check
+let backendOk = false;
+
+async function checkBackend() {
+  const url = $('backendUrl').value.trim();
+  $('statusText').textContent = currentLang === 'en' ? 'Checking...' : 'Sprawdzam...';
+  $('statusDot').className = 'status-dot';
+  try {
+    const r = await fetch(url + '/health', { signal: AbortSignal.timeout(4000) });
+    if (r.ok) {
+      const d = await r.json();
+      $('statusDot').className = 'status-dot ok';
+      $('statusText').textContent = t('status_ok') + ' · ' + (d.version || 'v1');
+      backendOk = true;
+    } else { throw new Error(); }
+  } catch {
+    $('statusDot').className = 'status-dot err';
+    $('statusText').textContent = t('status_err');
+    backendOk = false;
+  }
+  checkRunnable();
+}
+
+$('checkBtn').addEventListener('click', checkBackend);
+
+$('noteThreshold').addEventListener('input', e => {
+  $('thresholdVal').textContent = e.target.value;
+});
+
+function checkRunnable() {
+  $('runBtn').disabled = !(selectedFile && backendOk);
+}
+
+// Instructions toggle
+$('instToggle').addEventListener('click', () => {
+  const b = $('instBody');
+  const open = b.classList.toggle('show');
+  $('instArrow').textContent = open ? '▲' : '▼';
+});
+
+// Steps
+function getSteps() {
+  if (currentMode === 'vocal') {
+    return [{ id: 'sep', label: t('step_sep_vocal') }];
+  }
+  return [
+    { id: 'sep',  label: t('step_sep') },
+    { id: 'midi', label: t('step_midi') },
+    { id: 'tab',  label: t('step_tab') },
+  ];
+}
+
+function renderSteps(activeId, doneIds = [], errId = null) {
+  const list = $('stepList');
+  list.innerHTML = '';
+  getSteps().forEach(s => {
+    const done = doneIds.includes(s.id);
+    const active = s.id === activeId;
+    const err = s.id === errId;
+    const div = document.createElement('div');
+    div.className = 'step' + (active ? ' active' : '') + (done ? ' done' : '') + (err ? ' err' : '');
+    const icon = document.createElement('div');
+    if (active) {
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      div.appendChild(sp);
+    } else {
+      icon.className = 'step-icon';
+      icon.textContent = err ? '✕' : done ? '✓' : '○';
+      div.appendChild(icon);
+    }
+    const lbl = document.createElement('span');
+    lbl.textContent = s.label;
+    div.appendChild(lbl);
+    list.appendChild(div);
+  });
+}
+
+function setProgress(pct) {
+  $('progressBar').style.width = pct + '%';
+}
+
+// Run
+$('runBtn').addEventListener('click', async () => {
+  showError('');
+  $('tabOutput').classList.remove('show');
+  $('progressArea').classList.add('show');
+  $('runBtn').disabled = true;
+  tabData = null;
+  midiBlob = null;
+  $('downloadBassBtn').style.display = 'none';
+  $('downloadMidiBtn').style.display = 'none';
+  $('downloadTargetBtn').style.display = 'none';
+  $('downloadAccompBtn').style.display = 'none';
+
+  const url = $('backendUrl').value.trim();
+
+  if (currentMode === 'vocal') {
+    await runVocalSplit(url);
+  } else {
+    await runBassExtract(url);
+  }
+
+  $('runBtn').disabled = false;
+  checkRunnable();
+});
+
+async function runBassExtract(url) {
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('demucs_model', $('demucsModel').value);
+  fd.append('note_threshold', $('noteThreshold').value);
+  fd.append('tuning', [$('t1'), $('t2'), $('t3'), $('t4')].map(i => i.value.toUpperCase()).join(','));
+  fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
+  fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
+  fd.append('quantize', $('quantizeMode').value);
+
+  renderSteps('sep', []);
+  setProgress(5);
+
+  try {
+    const res = await fetch(url + '/extract', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
+      throw new Error(err.detail || 'HTTP ' + res.status);
+    }
+    renderSteps('midi', ['sep']);
+    setProgress(50);
+    await delay(300);
+    renderSteps('tab', ['sep', 'midi']);
+    setProgress(85);
+    await delay(300);
+
+    const data = await res.json();
+    renderSteps(null, ['sep', 'midi', 'tab']);
+    setProgress(100);
+    tabData = data.tab;
+    await delay(400);
+
+    showTab(data);
+    $('progressArea').classList.remove('show');
+    $('progressBar').style.width = '0%';
+  } catch (e) {
+    renderSteps(null, [], 'sep');
+    showError(t('err_prefix') + e.message);
+  }
+}
+
+async function runVocalSplit(url) {
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('demucs_model', $('demucsModel').value);
+  fd.append('stem', $('stemSelect').value);
+
+  renderSteps('sep', []);
+  setProgress(10);
+
+  try {
+    const res = await fetch(url + '/separate', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
+      throw new Error(err.detail || 'HTTP ' + res.status);
+    }
+    setProgress(90);
+    const data = await res.json();
+    renderSteps(null, ['sep']);
+    setProgress(100);
+    await delay(400);
+    showSplit(data, url);
+    $('progressArea').classList.remove('show');
+    $('progressBar').style.width = '0%';
+  } catch (e) {
+    renderSteps(null, [], 'sep');
+    showError(t('err_prefix') + e.message);
+  }
+}
+
+function showSplit(data, backendUrl) {
+  // Meta pills: stem name + accompaniment
+  const meta = $('tabMeta');
+  meta.innerHTML = '';
+  const stemName = t('name_' + data.target_label) || data.target_label;
+  const accompName = t('name_' + data.accomp_label) || data.accomp_label;
+  [
+    { label: '✓ ' + stemName, hi: true },
+    { label: '+ ' + accompName },
+  ].forEach(p => {
+    const span = document.createElement('span');
+    span.className = 'meta-pill' + (p.hi ? ' hi' : '');
+    span.textContent = p.label;
+    meta.appendChild(span);
+  });
+
+  // Wire up download buttons
+  const baseName = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'audio');
+  const tBtn = $('downloadTargetBtn');
+  const aBtn = $('downloadAccompBtn');
+  tBtn.textContent = t('label_target').replace('{x}', stemName);
+  aBtn.textContent = t('label_accomp').replace('{x}', accompName);
+  tBtn.onclick = () => downloadStem(backendUrl, data.target_id, `${baseName}_${data.target_label}.wav`);
+  aBtn.onclick = () => downloadStem(backendUrl, data.accomp_id, `${baseName}_${data.accomp_label}.wav`);
+  tBtn.style.display = '';
+  aBtn.style.display = '';
+
+  $('tabOutput').classList.add('show');
+}
+
+function downloadStem(url, id, filename) {
+  const a = document.createElement('a');
+  a.href = url + '/download/' + id;
+  a.download = filename;
+  a.click();
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showError(msg) {
+  const box = $('errorBox');
+  box.textContent = msg;
+  box.classList.toggle('show', !!msg);
+}
+
+function showTab(data) {
+  // Meta pills
+  const meta = $('tabMeta');
+  meta.innerHTML = '';
+  const pills = [
+    { label: t('meta_bpm') + Math.round(data.bpm || 0), hi: true },
+    { label: t('meta_notes') + (data.note_count || '?') },
+    { label: t('meta_dur') + (data.duration || '?') + 's' },
+    { label: t('meta_tuning') + (data.tuning || 'EADG') },
+    { label: t('meta_grid') + ($('quantizeMode').selectedOptions[0]?.text || '1/16') },
+  ];
+  pills.forEach(p => {
+    const span = document.createElement('span');
+    span.className = 'meta-pill' + (p.hi ? ' hi' : '');
+    span.textContent = p.label;
+    meta.appendChild(span);
+  });
+
+  // Render tab
+  $('tabPre').textContent = data.tab || '— brak danych —';
+  $('tabOutput').classList.add('show');
+
+  if (data.midi_b64) {
+    const bytes = atob(data.midi_b64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    midiBlob = new Blob([arr], { type: 'audio/midi' });
+    $('downloadMidiBtn').style.display = '';
+  }
+
+  if (data.bass_download_id) {
+    $('downloadBassBtn').dataset.id = data.bass_download_id;
+    $('downloadBassBtn').style.display = '';
+  }
+}
+
+// Copy / download
+$('copyBtn').addEventListener('click', () => {
+  if (tabData) navigator.clipboard.writeText(tabData).then(() => {
+    $('copyBtn').textContent = t('btn_copied');
+    setTimeout(() => $('copyBtn').textContent = t('btn_copy'), 1800);
+  });
+});
+
+$('downloadTabBtn').addEventListener('click', () => {
+  if (!tabData) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([tabData], { type: 'text/plain' }));
+  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_tab.txt';
+  a.click();
+});
+
+$('downloadMidiBtn').addEventListener('click', () => {
+  if (!midiBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(midiBlob);
+  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_bass.mid';
+  a.click();
+});
+
+$('downloadBassBtn').addEventListener('click', () => {
+  const id = $('downloadBassBtn').dataset.id;
+  if (!id) return;
+  const url = $('backendUrl').value.trim();
+  const a = document.createElement('a');
+  a.href = url + '/bass/' + id;
+  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_isolated.wav';
+  a.click();
+});
+</script>
+</body>
+</html>
