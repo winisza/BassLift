@@ -110,3 +110,7 @@ MIT — see [LICENSE](LICENSE).
 - [Demucs](https://github.com/facebookresearch/demucs) by Meta AI Research
 - [librosa](https://librosa.org/) for audio analysis
 - [FastAPI](https://fastapi.tiangolo.com/) for the backend
+
+## Vibe-coded
+
+This entire application was vibe-coded with [Claude](https://claude.ai/) Opus 4.6/4.7 — from architecture decisions through implementation to this very README.
