@@ -67,7 +67,7 @@ python -c "import torch; print('MPS:', torch.backends.mps.is_available())"
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<your-username>/basslift.git
+git clone https://github.com/winisza/basslift.git
 cd basslift
 
 # 2. (Recommended) create a virtual environment
