@@ -381,6 +381,105 @@
   }
   .error-box.show { display: block; }
 
+  /* Audio player */
+  .audio-player {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-top: 0.75rem;
+  }
+  .audio-player.show { display: flex; }
+  .audio-player-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .audio-player audio {
+    width: 100%;
+    height: 40px;
+    border-radius: 6px;
+    outline: none;
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+  }
+  .output-players {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Metronome */
+  .metronome-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+  }
+  .metro-bpm-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+  .metro-bpm-input {
+    width: 100px;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    font-family: var(--mono);
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.4rem 0.5rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .metro-bpm-input:focus { border-color: var(--accent); }
+  .metro-bpm-input::-webkit-inner-spin-button,
+  .metro-bpm-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .metro-bpm-input { -moz-appearance: textfield; }
+  .metro-bpm-label {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .metro-beat-indicator {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 2px solid var(--border2);
+    transition: background 0.05s, border-color 0.05s, box-shadow 0.05s;
+  }
+  .metro-beat-indicator.beat {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(192,149,108,0.5);
+  }
+  .metro-controls {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .metro-btn {
+    min-width: 110px;
+    text-align: center;
+  }
+  .metro-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   /* Instructions panel */
   .instructions {
     background: var(--bg2);
@@ -605,6 +704,10 @@
       </div>
       <button class="file-remove" id="fileRemove" title="Usuń">✕</button>
     </div>
+    <div class="audio-player" id="inputPlayer">
+      <div class="audio-player-label" data-i18n="player_input">Podgląd pliku wejściowego</div>
+      <audio controls id="inputAudio" preload="metadata"></audio>
+    </div>
   </div>
 
   <!-- Settings -->
@@ -695,13 +798,44 @@
     <div class="tab-scroll mode-bass-only">
       <pre class="tab-pre" id="tabPre"></pre>
     </div>
+    <div class="output-players">
+      <div class="audio-player" id="outputPlayerBass">
+        <div class="audio-player-label" data-i18n="player_bass">Izolowany bas</div>
+        <audio controls id="outputAudioBass" preload="metadata"></audio>
+      </div>
+      <div class="audio-player" id="outputPlayerTarget">
+        <div class="audio-player-label" id="outputTargetLabel">—</div>
+        <audio controls id="outputAudioTarget" preload="metadata"></audio>
+      </div>
+      <div class="audio-player" id="outputPlayerAccomp">
+        <div class="audio-player-label" id="outputAccompLabel">—</div>
+        <audio controls id="outputAudioAccomp" preload="metadata"></audio>
+      </div>
+    </div>
     <div class="action-row">
       <button class="action-btn mode-bass-only" id="copyBtn" data-i18n="btn_copy">Kopiuj tabulaturę</button>
       <button class="action-btn mode-bass-only" id="downloadTabBtn" data-i18n="btn_download_tab">Pobierz .txt</button>
       <button class="action-btn" id="downloadMidiBtn" style="display:none" data-i18n="btn_download_midi">Pobierz MIDI</button>
+      <button class="action-btn" id="downloadMusicXmlBtn" style="display:none" data-i18n="btn_download_musicxml">Pobierz MusicXML</button>
       <button class="action-btn" id="downloadBassBtn" style="display:none" data-i18n="btn_download_bass">Pobierz bas (WAV)</button>
       <button class="action-btn" id="downloadTargetBtn" style="display:none">Pobierz</button>
       <button class="action-btn" id="downloadAccompBtn" style="display:none">Pobierz</button>
+    </div>
+  </div>
+
+  <!-- Metronome -->
+  <div>
+    <div class="section-label" data-i18n="sec_metronome">04 — Metronom</div>
+    <div class="setting-card metronome-card">
+      <div class="metro-bpm-row">
+        <input type="number" id="metroBpm" min="30" max="300" value="120" class="metro-bpm-input" />
+        <span class="metro-bpm-label">BPM</span>
+      </div>
+      <div class="metro-beat-indicator" id="metroBeatIndicator"></div>
+      <div class="metro-controls">
+        <button class="action-btn metro-btn" id="metroStartBtn" data-i18n="metro_start">Start</button>
+        <button class="action-btn metro-btn" id="metroTapBtn" data-i18n="metro_tap">Tap tempo</button>
+      </div>
     </div>
   </div>
 
@@ -734,8 +868,10 @@
 <script>
 const $ = id => document.getElementById(id);
 let selectedFile = null;
+let inputObjectUrl = null;
 let tabData = null;
 let midiBlob = null;
+let musicxmlBlob = null;
 let currentMode = 'bass';   // 'bass' | 'vocal'
 let currentLang = 'pl';
 
@@ -782,6 +918,7 @@ const I18N = {
     btn_copied: 'Skopiowano!',
     btn_download_tab: 'Pobierz .txt',
     btn_download_midi: 'Pobierz MIDI',
+    btn_download_musicxml: 'Pobierz MusicXML',
     btn_download_bass: 'Pobierz bas (WAV)',
     inst_header: 'Jak uruchomić backend lokalnie',
     inst_req: 'Wymagania:',
@@ -815,6 +952,15 @@ const I18N = {
     name_no_bass: 'resztę (bez basu)',
     name_no_drums: 'resztę (bez perkusji)',
     name_no_other: 'resztę',
+    meta_timesig: 'Metrum: ',
+    player_input: 'Podgląd pliku wejściowego',
+    player_bass: 'Izolowany bas',
+    player_target: 'Odtwórz {x}',
+    player_accomp: 'Odtwórz {x}',
+    sec_metronome: '04 — Metronom',
+    metro_start: 'Start',
+    metro_stop: 'Stop',
+    metro_tap: 'Tap tempo',
   },
   en: {
     tagline: 'Audio → Bass → Tab',
@@ -857,6 +1003,7 @@ const I18N = {
     btn_copied: 'Copied!',
     btn_download_tab: 'Download .txt',
     btn_download_midi: 'Download MIDI',
+    btn_download_musicxml: 'Download MusicXML',
     btn_download_bass: 'Download bass (WAV)',
     inst_header: 'How to run the backend locally',
     inst_req: 'Requirements:',
@@ -890,6 +1037,15 @@ const I18N = {
     name_no_bass: 'rest (no bass)',
     name_no_drums: 'rest (no drums)',
     name_no_other: 'rest',
+    meta_timesig: 'Time sig: ',
+    player_input: 'Input file preview',
+    player_bass: 'Isolated bass',
+    player_target: 'Play {x}',
+    player_accomp: 'Play {x}',
+    sec_metronome: '04 — Metronome',
+    metro_start: 'Start',
+    metro_stop: 'Stop',
+    metro_tap: 'Tap tempo',
   },
 };
 
@@ -902,6 +1058,11 @@ function applyLang() {
   document.documentElement.lang = currentLang;
   // Update run button label depending on mode
   $('runBtn').textContent = t(currentMode === 'bass' ? 'btn_run_bass' : 'btn_run_vocal');
+  // Preserve metronome button state after language switch
+  const metroBtn = $('metroStartBtn');
+  if (metroBtn && metroBtn.classList.contains('active')) {
+    metroBtn.textContent = t('metro_stop');
+  }
 }
 
 document.querySelectorAll('.lang-btn').forEach(btn => {
@@ -977,6 +1138,10 @@ function setFile(f) {
   $('fileSize').textContent = (f.size / 1048576).toFixed(2) + ' MB';
   uploadArea.style.display = 'none';
   fileChosen.classList.add('show');
+  if (inputObjectUrl) URL.revokeObjectURL(inputObjectUrl);
+  inputObjectUrl = URL.createObjectURL(f);
+  $('inputAudio').src = inputObjectUrl;
+  $('inputPlayer').classList.add('show');
   checkRunnable();
 }
 
@@ -985,6 +1150,10 @@ $('fileRemove').addEventListener('click', () => {
   fileInput.value = '';
   uploadArea.style.display = '';
   fileChosen.classList.remove('show');
+  if (inputObjectUrl) { URL.revokeObjectURL(inputObjectUrl); inputObjectUrl = null; }
+  $('inputAudio').removeAttribute('src');
+  $('inputAudio').load();
+  $('inputPlayer').classList.remove('show');
   checkRunnable();
 });
 
@@ -1078,10 +1247,15 @@ $('runBtn').addEventListener('click', async () => {
   $('runBtn').disabled = true;
   tabData = null;
   midiBlob = null;
+  musicxmlBlob = null;
   $('downloadBassBtn').style.display = 'none';
   $('downloadMidiBtn').style.display = 'none';
+  $('downloadMusicXmlBtn').style.display = 'none';
   $('downloadTargetBtn').style.display = 'none';
   $('downloadAccompBtn').style.display = 'none';
+  $('outputPlayerBass').classList.remove('show');
+  $('outputPlayerTarget').classList.remove('show');
+  $('outputPlayerAccomp').classList.remove('show');
 
   const url = $('backendUrl').value.trim();
 
@@ -1192,6 +1366,14 @@ function showSplit(data, backendUrl) {
   tBtn.style.display = '';
   aBtn.style.display = '';
 
+  $('outputAudioTarget').src = backendUrl + '/download/' + data.target_id;
+  $('outputTargetLabel').textContent = t('player_target').replace('{x}', stemName);
+  $('outputPlayerTarget').classList.add('show');
+
+  $('outputAudioAccomp').src = backendUrl + '/download/' + data.accomp_id;
+  $('outputAccompLabel').textContent = t('player_accomp').replace('{x}', accompName);
+  $('outputPlayerAccomp').classList.add('show');
+
   $('tabOutput').classList.add('show');
 }
 
@@ -1221,6 +1403,9 @@ function showTab(data) {
     { label: t('meta_tuning') + (data.tuning || 'EADG') },
     { label: t('meta_grid') + ($('quantizeMode').selectedOptions[0]?.text || '1/16') },
   ];
+  if (data.time_sig) {
+    pills.push({ label: t('meta_timesig') + data.time_sig + '/4' });
+  }
   pills.forEach(p => {
     const span = document.createElement('span');
     span.className = 'meta-pill' + (p.hi ? ' hi' : '');
@@ -1240,9 +1425,26 @@ function showTab(data) {
     $('downloadMidiBtn').style.display = '';
   }
 
+  if (data.musicxml_b64) {
+    const bytes = atob(data.musicxml_b64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    musicxmlBlob = new Blob([arr], { type: 'application/vnd.recordare.musicxml+xml' });
+    $('downloadMusicXmlBtn').style.display = '';
+  }
+
   if (data.bass_download_id) {
     $('downloadBassBtn').dataset.id = data.bass_download_id;
     $('downloadBassBtn').style.display = '';
+    const bassUrl = $('backendUrl').value.trim() + '/bass/' + data.bass_download_id;
+    $('outputAudioBass').src = bassUrl;
+    $('outputPlayerBass').classList.add('show');
+  }
+
+  // Auto-fill metronome BPM from extraction
+  if (data.bpm && data.bpm > 0) {
+    metroBpm = clampBpm(Math.round(data.bpm));
+    $('metroBpm').value = metroBpm;
   }
 }
 
@@ -1270,6 +1472,14 @@ $('downloadMidiBtn').addEventListener('click', () => {
   a.click();
 });
 
+$('downloadMusicXmlBtn').addEventListener('click', () => {
+  if (!musicxmlBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(musicxmlBlob);
+  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_bass.musicxml';
+  a.click();
+});
+
 $('downloadBassBtn').addEventListener('click', () => {
   const id = $('downloadBassBtn').dataset.id;
   if (!id) return;
@@ -1278,6 +1488,122 @@ $('downloadBassBtn').addEventListener('click', () => {
   a.href = url + '/bass/' + id;
   a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_isolated.wav';
   a.click();
+});
+
+// ─── Metronome ───
+let metroAudioCtx = null;
+let metroRunning = false;
+let metroTimerID = null;
+let metroNextNoteTime = 0;
+let metroBpm = 120;
+let metroTapTimes = [];
+let metroTapTimeout = null;
+
+const METRO_SCHEDULE_AHEAD = 0.1;
+const METRO_SCHEDULE_INTERVAL = 25;
+const METRO_TAP_TIMEOUT = 2000;
+const METRO_TAP_MAX = 8;
+
+function clampBpm(v) {
+  return Math.max(30, Math.min(300, v));
+}
+
+function metroPlayClick(time) {
+  const ctx = metroAudioCtx;
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, time);
+  osc.frequency.exponentialRampToValueAtTime(440, time + 0.04);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.7, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.07);
+}
+
+function metroScheduleBeatFlash(audioTime) {
+  const delay = (audioTime - metroAudioCtx.currentTime) * 1000;
+  setTimeout(() => {
+    const indicator = $('metroBeatIndicator');
+    indicator.classList.add('beat');
+    setTimeout(() => indicator.classList.remove('beat'), 100);
+  }, Math.max(0, delay));
+}
+
+function metroScheduler() {
+  if (!metroRunning) return;
+  const secondsPerBeat = 60.0 / metroBpm;
+  while (metroNextNoteTime < metroAudioCtx.currentTime + METRO_SCHEDULE_AHEAD) {
+    metroPlayClick(metroNextNoteTime);
+    metroScheduleBeatFlash(metroNextNoteTime);
+    metroNextNoteTime += secondsPerBeat;
+  }
+  metroTimerID = setTimeout(metroScheduler, METRO_SCHEDULE_INTERVAL);
+}
+
+function metroStart() {
+  if (metroRunning) return;
+  if (!metroAudioCtx) {
+    metroAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (metroAudioCtx.state === 'suspended') {
+    metroAudioCtx.resume();
+  }
+  metroBpm = clampBpm(parseInt($('metroBpm').value) || 120);
+  $('metroBpm').value = metroBpm;
+  metroRunning = true;
+  metroNextNoteTime = metroAudioCtx.currentTime + 0.05;
+  metroScheduler();
+  $('metroStartBtn').textContent = t('metro_stop');
+  $('metroStartBtn').classList.add('active');
+}
+
+function metroStop() {
+  if (!metroRunning) return;
+  metroRunning = false;
+  clearTimeout(metroTimerID);
+  metroTimerID = null;
+  $('metroStartBtn').textContent = t('metro_start');
+  $('metroStartBtn').classList.remove('active');
+  $('metroBeatIndicator').classList.remove('beat');
+}
+
+function metroToggle() {
+  metroRunning ? metroStop() : metroStart();
+}
+
+function metroTap() {
+  const now = Date.now();
+  clearTimeout(metroTapTimeout);
+  metroTapTimeout = setTimeout(() => { metroTapTimes = []; }, METRO_TAP_TIMEOUT);
+  metroTapTimes.push(now);
+  if (metroTapTimes.length > METRO_TAP_MAX) {
+    metroTapTimes = metroTapTimes.slice(-METRO_TAP_MAX);
+  }
+  if (metroTapTimes.length >= 2) {
+    const intervals = [];
+    for (let i = 1; i < metroTapTimes.length; i++) {
+      intervals.push(metroTapTimes[i] - metroTapTimes[i - 1]);
+    }
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const bpm = clampBpm(Math.round(60000 / avgInterval));
+    metroBpm = bpm;
+    $('metroBpm').value = bpm;
+  }
+}
+
+$('metroStartBtn').addEventListener('click', metroToggle);
+$('metroTapBtn').addEventListener('click', metroTap);
+
+$('metroBpm').addEventListener('change', () => {
+  metroBpm = clampBpm(parseInt($('metroBpm').value) || 120);
+  $('metroBpm').value = metroBpm;
+});
+$('metroBpm').addEventListener('input', () => {
+  const val = parseInt($('metroBpm').value);
+  if (val >= 30 && val <= 300) metroBpm = val;
 });
 </script>
 </body>

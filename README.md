@@ -6,8 +6,9 @@
 
 Local audio tool that does two things:
 
-1. **Bass → Tablature** — extracts the bass line from a song, transcribes it to notes, and generates a 4-string bass tab (with optional MIDI export and isolated bass WAV).
+1. **Bass → Tablature** — extracts the bass line from a song, transcribes it to notes, and generates a 4-string bass tab (with optional MIDI, MusicXML export and isolated bass WAV).
 2. **Vocals + Instrumental split** — separates a song into two stems (vocals/drums/bass/other + the rest) and lets you download both as WAV.
+3. **Metronome** — built-in play-along metronome with tap tempo, auto-filled BPM from extraction.
 
 Everything runs locally on your machine. No audio is ever uploaded to a third-party server.
 
@@ -22,7 +23,7 @@ Everything runs locally on your machine. No audio is ever uploaded to a third-pa
 ## How it works
 
 - **Source separation:** [Demucs](https://github.com/facebookresearch/demucs) (Hybrid Transformer model, `htdemucs`)
-- **Pitch detection:** [librosa](https://librosa.org/) — probabilistic YIN (`pyin`)
+- **Pitch detection:** [librosa](https://librosa.org/) — probabilistic YIN (`pyin`) with median filtering, octave error correction, and adaptive confidence thresholds
 - **Backend:** FastAPI + Uvicorn
 - **Frontend:** single static HTML file (no build step)
 
@@ -67,7 +68,7 @@ python -c "import torch; print('MPS:', torch.backends.mps.is_available())"
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/winisza/basslift.git
+git clone https://github.com/<your-username>/basslift.git
 cd basslift
 
 # 2. (Recommended) create a virtual environment
@@ -93,7 +94,7 @@ The frontend will auto-detect the backend at `http://localhost:8000`.
 
 ### Bass → Tablature
 
-Upload a song, pick options, hit run. Output is an ASCII tab plus optional MIDI / isolated bass WAV.
+Upload a song, pick options, hit run. Output is an ASCII tab plus optional MIDI / MusicXML / isolated bass WAV. Built-in audio players let you listen to the original track and separated stems directly in the browser.
 
 Tunable parameters:
 
@@ -108,15 +109,20 @@ Tunable parameters:
 
 Upload a song, choose what to extract (vocals, drums, bass, or other), hit run. Get two WAV files back.
 
+### Metronome
+
+Always-visible play-along metronome with a BPM input (30–300) and tap tempo. After extraction, the detected BPM auto-fills the metronome. Audio click with visual beat indicator flash.
+
 ## API endpoints
 
 If you want to integrate the backend into your own tool:
 
 ```
 GET  /health                 → version info
-POST /extract                → bass tab pipeline (multipart form)
+POST /extract                → bass tab pipeline (multipart form); returns tab, MIDI, MusicXML, time signature
 POST /separate               → stem split (multipart form)
 GET  /download/{file_id}     → fetch a cached stem WAV
+GET  /bass/{file_id}         → fetch isolated bass stem
 ```
 
 See `server.py` for full parameter docs.
@@ -125,7 +131,8 @@ See `server.py` for full parameter docs.
 
 - Pitch detection is monophonic — chords on the bass won't be transcribed correctly.
 - Slap, pull-off, hammer-on, slides, and ghost notes aren't detected as techniques.
-- BPM detection works well for steady tempos. Free-time playing will produce odd results.
+- Time signature detection supports 3/4 and 4/4 only. Other time signatures default to 4/4.
+- BPM detection uses multi-method cross-validation and works well for steady tempos. Free-time playing will produce odd results.
 - The detection threshold is the most important knob. Start at 40 and adjust to taste.
 
 ## License
