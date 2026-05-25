@@ -14,6 +14,70 @@ Ideas under consideration (no commitments):
 - 5-string bass support (B0 lowest)
 - Web UI hosted version (no local backend needed)
 
+## [0.3.0] - 2026-05-25
+
+Major update: neural transcription engine (CREPE) alongside librosa pyin, one-click launcher, light/dark theme switcher, expanded metronome (timbres + meter + multi-accents), and a UX pass on the settings panel.
+
+### Added
+
+**Transcription — CREPE engine**
+
+- New neural pitch tracker as a selectable alternative to librosa pyin: `torchcrepe` `full` model on 16 kHz resampled bass audio
+- Engine selector dropdown in section "02 — Settings" (librosa pyin / CREPE neural), persisted to `localStorage`
+- Backend: `transcription_engine` form field on `POST /extract`; new `transcribe_bass_crepe()` function reuses every existing post-processing helper (`segment_notes`, `quantize_to_grid`, `merge_close_notes`, `filter_notes`, BPM / onset / time-sig detection) — only the f0 source changes
+- Adaptive periodicity threshold (mapped from the existing 0–127 confidence slider), median/mean smoothing per torchcrepe recommendations, lighter octave-error correction (CREPE rarely octave-halves)
+- GPU used automatically when CUDA is available
+- Lazy import with a clear HTTP 500 message if `torchcrepe` is not installed — pyin keeps working
+- ~150 MB CREPE model downloaded on first use
+- New dependency: `torchcrepe>=0.0.23`
+
+**One-click launcher**
+
+- `run.py` — Python launcher that starts uvicorn on `127.0.0.1:8000` and opens the browser after the port binds
+- `BassLift.bat` — Windows double-click launcher (`cd /d "%~dp0"` + `python run.py` + `pause` so errors are visible)
+- FastAPI now serves the GUI directly: `GET /` returns `web_gui.html`, `logo/` mounted as static files — no more `file://` opens, no CORS friction
+- Frontend auto-points `#backendUrl` at `window.location.origin` when loaded over http(s), so the same HTML works on any host/port
+
+**Theme switcher (light theme)**
+
+- New light theme: cream background (`#f5efe1`), navy accent (`#1a2a52`), navy primary buttons with cream text
+- Dark/light toggle next to the language switcher in the header (`●` / `○`), persisted to `localStorage('basslift_theme')`
+- `:root[data-theme="light"]` block overrides theme tokens; dark stays the default (no regression for existing users)
+- 6 new CSS tokens introduced to absorb previously hardcoded colors: `--accent-soft`, `--accent-glow`, `--accent-glow-strong`, `--red-soft`, `--red-border`, `--btn-text-on-accent`
+
+**Metronome — timbres, meter, accents**
+
+- Three selectable timbres from a dropdown:
+  - "Electronic" — existing 880→440 Hz sine sweep
+  - "Classic mechanical" — band-pass-filtered noise burst (dry wood-tick)
+  - "Subtle" — soft 600 Hz sine with 5 ms attack
+- Time signature dropdown: 2/4, 3/4, 4/4, 5/4, 6/8, 7/8 (4/4 default)
+- Multi-accent selector — one toggle button per beat in the bar; accent = same timbre an octave up, ~1.6× louder
+- Stronger beat-indicator flash on accented beats (`.beat-accent` with wider glow)
+- New i18n keys (PL + EN): `metro_timbre`, `metro_meter`, `metro_accents`, `timbre_beep` / `timbre_mechanical` / `timbre_soft`
+
+**Settings panel — collapsible**
+
+- Section "02 — Settings" is now wrapped in `.settings-collapse` with a clickable header (arrow `▼`/`▲`), mirroring the existing instructions pattern
+- Collapsed by default; expansion state persisted to `localStorage('basslift_settings_open')`
+
+### Changed
+
+- `server.py`: `app` and `VERSION` bumped to 0.3.0
+- `POST /extract` accepts `transcription_engine` ("pyin" | "crepe"); logs the engine label in step 2/3
+- `requirements.txt`: added `torchcrepe>=0.0.23`
+- `README.md`: "How it works" now documents both pitch engines and the CREPE model download
+- All `<audio>` elements (`inputAudio`, `outputAudioBass`, `outputAudioTarget`, `outputAudioAccomp`) are tracked centrally for stop/exclusivity
+- Hardcoded color literals (6 occurrences across upload area, status dot, Run button text, error box, beat indicator) replaced with CSS variables — no visual change for the dark theme
+
+### Fixed
+
+- **Audio kept playing after tab switch / new extraction** — players were hidden via class removal but the underlying `<audio>` was never paused. Introduced `stopAllAudio()` and called it from: Run button handler, `applyMode()` (tab switch), and `fileRemove` handler
+- **Two players could play simultaneously** — added `play` listeners on every `<audio>` that pause all others on start, so a new player always stops the previous one
+
+[Unreleased]: https://github.com/winisza/BassLift/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/winisza/BassLift/compare/v0.2.0...v0.3.0
+
 ## [0.2.0] - 2026-05-18
 
 Major update: built-in audio players, metronome, transcription quality improvements, and MusicXML export.
@@ -139,6 +203,5 @@ First public release. Local audio tool with two operating modes.
 - Time signature is not detected — output assumes 4/4
 - First Demucs run downloads ~300 MB of model weights
 
-[Unreleased]: https://github.com/winisza/BassLift/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/winisza/BassLift/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/winisza/BassLift/releases/tag/v0.1.0

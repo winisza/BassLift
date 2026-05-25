@@ -15,6 +15,7 @@ import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 log = logging.getLogger("basslift")
@@ -25,10 +26,22 @@ try:
 except ImportError:
     HAS_MIDI = False
 
-app = FastAPI(title="BassLift", version="0.2.0")
+app = FastAPI(title="BassLift", version="0.3.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-VERSION = "0.2.0"
+ROOT_DIR = Path(__file__).parent
+
+
+@app.get("/")
+def index():
+    return FileResponse(ROOT_DIR / "web_gui.html")
+
+
+# Serwuj katalog logo/ jeśli istnieje
+if (ROOT_DIR / "logo").is_dir():
+    app.mount("/logo", StaticFiles(directory=ROOT_DIR / "logo"), name="logo")
+
+VERSION = "0.3.0"
 
 BASS_FREQ_MIN = 30.0
 BASS_FREQ_MAX = 262.0   # do C4 — łapie grę wysoko na gryfie
@@ -152,6 +165,7 @@ async def extract(
     export_midi: str = Form("no"),
     export_bass: str = Form("no"),
     quantize: str = Form("16"),
+    transcription_engine: str = Form("pyin"),  # "pyin" | "crepe"
 ):
     allowed = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac"}
     suffix = Path(file.filename).suffix.lower()
@@ -166,8 +180,12 @@ async def extract(
         log.info("Krok 1/3 — Demucs separacja basu (%s)", demucs_model)
         bass_path = run_demucs(src, tmpdir, demucs_model)
 
-        log.info("Krok 2/3 — Transkrypcja (librosa pyin)")
-        notes, bpm, duration, time_sig = transcribe_bass(bass_path, note_threshold, quantize)
+        engine_label = "CREPE (torchcrepe)" if transcription_engine == "crepe" else "librosa pyin"
+        log.info("Krok 2/3 — Transkrypcja (%s)", engine_label)
+        if transcription_engine == "crepe":
+            notes, bpm, duration, time_sig = transcribe_bass_crepe(bass_path, note_threshold, quantize)
+        else:
+            notes, bpm, duration, time_sig = transcribe_bass(bass_path, note_threshold, quantize)
         log.info("  Wykryto %d nut, BPM=%.1f, dlugosc=%.1fs, metrum=%d/4",
                  len(notes), bpm, duration, time_sig)
 
@@ -303,6 +321,115 @@ def transcribe_bass(bass_path: Path, threshold_velocity: int, quantize_mode: str
                           hop_sec=hop/sr, onset_times=onset_times)
 
     # Kwantyzuj do siatki metrycznej (onset-aware)
+    notes = quantize_to_grid(notes, bpm, quantize_mode, onset_times=onset_times)
+
+    # Merge close same-pitch notes split by quantization
+    grid_dur = _grid_duration(bpm, quantize_mode)
+    notes = merge_close_notes(notes, min_gap=grid_dur)
+
+    # Filtruj zbyt krótkie / duplikaty
+    notes = filter_notes(notes)
+
+    return notes, bpm, duration, time_sig
+
+
+# ────────────────────────────────────────────────
+# KROK 2 (alternatywa) — Transkrypcja: torchcrepe (neural)
+# ────────────────────────────────────────────────
+def transcribe_bass_crepe(bass_path: Path, threshold_velocity: int, quantize_mode: str = "16") -> tuple:
+    """Transkrypcja basu przy pomocy CREPE (torchcrepe) — neuronowy pitch tracker.
+
+    Znacznie celniejszy niż librosa.pyin (mniej skoków oktawowych w niskim rejestrze,
+    lepsze granice nut), kosztem dłuższego czasu inferencji (~10-30s/min audio na CPU).
+    Wykorzystuje GPU jeśli dostępne (CUDA).
+    """
+    import librosa
+    try:
+        import torch
+        import torchcrepe
+    except ImportError:
+        raise HTTPException(
+            500,
+            "Silnik CREPE wymaga pakietów torch i torchcrepe. Zainstaluj: pip install torchcrepe"
+        )
+
+    # Wczytaj audio w natywnej sr, potem resampling do 16 kHz (CREPE wymaga 16 kHz)
+    y, sr_native = librosa.load(str(bass_path), sr=None, mono=True)
+    target_sr = 16000
+    if sr_native != target_sr:
+        y_resampled = librosa.resample(y, orig_sr=sr_native, target_sr=target_sr)
+    else:
+        y_resampled = y
+    duration = librosa.get_duration(y=y, sr=sr_native)
+
+    # BPM + metrum (na oryginalnej sr — lepsza detekcja onsetów rytmu)
+    bpm = detect_bpm(y, sr_native)
+    log.info("  BPM=%.1f", bpm)
+    time_sig = detect_time_signature(y, sr_native)
+    log.info("  Time signature: %d/4", time_sig)
+
+    # CREPE: hop = 160 sampli przy 16 kHz = 10 ms
+    hop = 160
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    log.info("  Uruchamiam torchcrepe (model=full, device=%s)...", device)
+
+    audio_tensor = torch.tensor(y_resampled, dtype=torch.float32).unsqueeze(0)
+    f0_t, periodicity_t = torchcrepe.predict(
+        audio_tensor,
+        target_sr,
+        hop_length=hop,
+        fmin=BASS_FREQ_MIN,
+        fmax=BASS_FREQ_MAX,
+        model='full',
+        return_periodicity=True,
+        device=device,
+        batch_size=2048,
+        pad=True,
+    )
+
+    # Wygładź wyniki zgodnie z rekomendacjami torchcrepe
+    periodicity_t = torchcrepe.filter.median(periodicity_t, 3)
+    f0_t = torchcrepe.filter.mean(f0_t, 3)
+
+    f0 = f0_t.squeeze(0).cpu().numpy()
+    periodicity = periodicity_t.squeeze(0).cpu().numpy()
+
+    times = np.arange(len(f0)) * (hop / target_sr)
+
+    # Onset detection na audio przekazanym do CREPE (16 kHz)
+    onset_times = detect_onsets(y_resampled, target_sr, hop)
+    log.info("  Detected %d onsets", len(onset_times))
+
+    # Adaptive threshold na periodicity (zakres ~0.2-0.95)
+    base_threshold = 0.21 + (threshold_velocity / 127.0) * 0.30
+
+    mask = (
+        np.isfinite(f0) &
+        (f0 >= BASS_FREQ_MIN) &
+        (f0 <= BASS_FREQ_MAX) &
+        (periodicity >= base_threshold)
+    )
+
+    times_f = times[mask]
+    f0_f = f0[mask]
+    probs_f = periodicity[mask]
+
+    if len(times_f) == 0:
+        log.warning("  Brak wykrytych nut — sprobuj obnizyc prog")
+        return [], bpm, duration, time_sig
+
+    # F0 → MIDI pitch
+    midi_pitches = freq_to_midi(f0_f)
+
+    # Pitch smoothing — CREPE rzadziej halffa, więc octave correction łagodniejsza
+    midi_pitches = median_filter_pitches(midi_pitches, kernel_size=5)
+    midi_pitches = correct_octave_errors(midi_pitches, max_short_frames=1)
+
+    # Segmentacja w nuty (ten sam helper co dla pyin)
+    notes = segment_notes(times_f, midi_pitches, probs_f,
+                          hop_sec=hop/target_sr, onset_times=onset_times)
+
+    # Kwantyzacja do siatki metrycznej (onset-aware)
     notes = quantize_to_grid(notes, bpm, quantize_mode, onset_times=onset_times)
 
     # Merge close same-pitch notes split by quantization

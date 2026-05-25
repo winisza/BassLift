@@ -21,9 +21,35 @@
     --text2: #918e88;
     --text3: #5e5f66;
     --red: #d4605c;
+    --accent-soft: rgba(192,149,108,0.04);
+    --accent-glow: rgba(192,149,108,0.4);
+    --accent-glow-strong: rgba(192,149,108,0.5);
+    --red-soft: rgba(212,96,92,0.08);
+    --red-border: rgba(212,96,92,0.25);
+    --btn-text-on-accent: #111520;
     --mono: 'Space Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     --radius: 10px;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f5efe1;
+    --bg2: #ebe3d0;
+    --bg3: #e0d6bd;
+    --border: #cdbfa0;
+    --border2: #b8a880;
+    --accent: #1a2a52;
+    --accent2: #3d5a8a;
+    --text: #1a2030;
+    --text2: #5a5347;
+    --text3: #857a64;
+    --red: #a83a36;
+    --accent-soft: rgba(26,42,82,0.06);
+    --accent-glow: rgba(26,42,82,0.35);
+    --accent-glow-strong: rgba(26,42,82,0.5);
+    --red-soft: rgba(168,58,54,0.1);
+    --red-border: rgba(168,58,54,0.35);
+    --btn-text-on-accent: #f5efe1;
   }
 
   body {
@@ -103,7 +129,7 @@
     transition: border-color 0.2s, background 0.2s;
     position: relative;
   }
-  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: rgba(192,149,108,0.04); }
+  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: var(--accent-soft); }
   .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
   .upload-icon {
@@ -205,7 +231,7 @@
     flex-shrink: 0;
     transition: background 0.3s;
   }
-  .status-dot.ok { background: var(--accent); box-shadow: 0 0 6px rgba(192,149,108,0.4); }
+  .status-dot.ok { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
   .status-dot.err { background: var(--red); }
   .status-text { color: var(--text2); flex: 1; }
   .backend-url-input {
@@ -237,7 +263,7 @@
     width: 100%;
     padding: 1rem;
     background: var(--accent);
-    color: #111520;
+    color: var(--btn-text-on-accent);
     font-family: var(--mono);
     font-size: 0.9rem;
     font-weight: 700;
@@ -273,7 +299,7 @@
   }
   .step.active { background: var(--bg3); }
   .step.done { opacity: 0.6; }
-  .step.err { background: rgba(212,96,92,0.08); }
+  .step.err { background: var(--red-soft); }
 
   .step-icon {
     font-size: 0.9rem;
@@ -371,8 +397,8 @@
   /* Error */
   .error-box {
     display: none;
-    background: rgba(212,96,92,0.08);
-    border: 1px solid rgba(212,96,92,0.25);
+    background: var(--red-soft);
+    border: 1px solid var(--red-border);
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
     font-size: 0.85rem;
@@ -465,7 +491,7 @@
   .metro-beat-indicator.beat {
     background: var(--accent);
     border-color: var(--accent);
-    box-shadow: 0 0 16px rgba(192,149,108,0.5);
+    box-shadow: 0 0 16px var(--accent-glow-strong);
   }
   .metro-controls {
     display: flex;
@@ -478,6 +504,60 @@
   .metro-btn.active {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .metro-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .metro-label {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text3);
+    font-size: 0.8rem;
+  }
+  .metro-select {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .metro-select:focus { border-color: var(--accent); }
+  .metro-accents {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .metro-accent-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    font-family: var(--mono);
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .metro-accent-btn:hover { border-color: var(--accent); }
+  .metro-accent-btn.accented {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .metro-beat-indicator.beat-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 28px var(--accent);
   }
 
   /* Instructions panel */
@@ -505,6 +585,37 @@
     display: none;
   }
   .instructions-body.show { display: block; }
+
+  /* Collapsible settings */
+  .settings-collapse {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .settings-header {
+    padding: 0.85rem 1.25rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text2);
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .settings-header:hover { color: var(--text); }
+  .settings-body {
+    padding: 1.25rem;
+    display: none;
+  }
+  .settings-body.show { display: block; }
+  .settings-collapse:has(.settings-body.show) .settings-header { border-bottom-color: var(--border); }
 
   .code-block {
     background: var(--bg3);
@@ -550,6 +661,31 @@
     color: var(--accent);
   }
   .lang-btn:hover:not(.active) { color: var(--text2); }
+
+  /* Theme switcher */
+  .theme-switch {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-left: 1rem;
+  }
+  .theme-btn {
+    background: transparent;
+    border: none;
+    padding: 0.35rem 0.6rem;
+    font: 0.85rem var(--mono);
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .theme-btn.active {
+    background: var(--bg3);
+    color: var(--accent);
+  }
+  .theme-btn:hover:not(.active) { color: var(--text2); }
 
   /* Mode tabs */
   .mode-tabs {
@@ -667,6 +803,10 @@
   <div class="logo">Bass<span>/</span>Lift</div>
   <div class="tagline" data-i18n="tagline">Audio → Bass → Tab</div>
   <div class="badge">EXPERIMENTAL</div>
+  <div class="theme-switch">
+    <button class="theme-btn active" data-theme="dark" title="Dark">●</button>
+    <button class="theme-btn" data-theme="light" title="Light">○</button>
+  </div>
   <div class="lang-switch">
     <button class="lang-btn active" data-lang="pl">PL</button>
     <button class="lang-btn" data-lang="en">EN</button>
@@ -711,8 +851,12 @@
   </div>
 
   <!-- Settings -->
-  <div>
-    <div class="section-label" data-i18n="sec_settings">02 — Ustawienia</div>
+  <div class="settings-collapse">
+    <div class="settings-header" id="settingsToggle">
+      <span data-i18n="sec_settings">02 — Ustawienia</span>
+      <span id="settingsArrow" style="margin-left:auto">▼</span>
+    </div>
+    <div class="settings-body" id="settingsBody">
     <div class="settings-grid">
       <div class="setting-card">
         <div class="setting-name" data-i18n="set_model">Model separacji (Demucs)</div>
@@ -720,6 +864,13 @@
           <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (zalecany)</option>
           <option value="htdemucs_ft" data-i18n="model_htdemucs_ft">htdemucs_ft (fine-tuned)</option>
           <option value="mdx_extra" data-i18n="model_mdx">mdx_extra (wolniejszy)</option>
+        </select>
+      </div>
+      <div class="setting-card mode-bass-only">
+        <div class="setting-name" data-i18n="set_engine">Silnik transkrypcji</div>
+        <select id="transcriptionEngine">
+          <option value="pyin" data-i18n="engine_pyin">librosa pyin (szybki)</option>
+          <option value="crepe" data-i18n="engine_crepe">CREPE neural (celny)</option>
         </select>
       </div>
       <div class="setting-card mode-bass-only">
@@ -766,6 +917,7 @@
           <option value="other" data-i18n="stem_other">Inne (i reszta)</option>
         </select>
       </div>
+    </div>
     </div>
   </div>
 
@@ -831,6 +983,27 @@
         <input type="number" id="metroBpm" min="30" max="300" value="120" class="metro-bpm-input" />
         <span class="metro-bpm-label">BPM</span>
       </div>
+      <div class="metro-row">
+        <label class="metro-label" data-i18n="metro_timbre">Barwa</label>
+        <select id="metroTimbre" class="metro-select">
+          <option value="beep" data-i18n="timbre_beep">Elektroniczny</option>
+          <option value="mechanical" data-i18n="timbre_mechanical">Klasyczny mechaniczny</option>
+          <option value="soft" data-i18n="timbre_soft">Subtelny</option>
+        </select>
+        <label class="metro-label" data-i18n="metro_meter">Metrum</label>
+        <select id="metroMeter" class="metro-select">
+          <option value="2/4">2/4</option>
+          <option value="3/4">3/4</option>
+          <option value="4/4" selected>4/4</option>
+          <option value="5/4">5/4</option>
+          <option value="6/8">6/8</option>
+          <option value="7/8">7/8</option>
+        </select>
+      </div>
+      <div class="metro-row">
+        <label class="metro-label" data-i18n="metro_accents">Akcenty</label>
+        <div class="metro-accents" id="metroAccents"></div>
+      </div>
       <div class="metro-beat-indicator" id="metroBeatIndicator"></div>
       <div class="metro-controls">
         <button class="action-btn metro-btn" id="metroStartBtn" data-i18n="metro_start">Start</button>
@@ -867,6 +1040,30 @@
 
 <script>
 const $ = id => document.getElementById(id);
+
+const ALL_AUDIO_IDS = ['inputAudio', 'outputAudioBass', 'outputAudioTarget', 'outputAudioAccomp'];
+
+function stopAllAudio() {
+  ALL_AUDIO_IDS.forEach(id => {
+    const a = $(id);
+    if (a && !a.paused) a.pause();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ALL_AUDIO_IDS.forEach(id => {
+    const a = $(id);
+    if (!a) return;
+    a.addEventListener('play', () => {
+      ALL_AUDIO_IDS.forEach(otherId => {
+        if (otherId === id) return;
+        const other = $(otherId);
+        if (other && !other.paused) other.pause();
+      });
+    });
+  });
+});
+
 let selectedFile = null;
 let inputObjectUrl = null;
 let tabData = null;
@@ -902,6 +1099,9 @@ const I18N = {
     quant_8t: '1/8T (triole ósemkowe)',
     quant_16: '1/16 (szesnastki)',
     quant_16t: '1/16T (triole szesnastkowe)',
+    set_engine: 'Silnik transkrypcji',
+    engine_pyin: 'librosa pyin (szybki)',
+    engine_crepe: 'CREPE neural (celny)',
     set_stem: 'Co wyciągnąć',
     stem_vocals: 'Wokal (i instrumental)',
     stem_drums: 'Perkusja (i reszta)',
@@ -961,6 +1161,12 @@ const I18N = {
     metro_start: 'Start',
     metro_stop: 'Stop',
     metro_tap: 'Tap tempo',
+    metro_timbre: 'Barwa',
+    metro_meter: 'Metrum',
+    metro_accents: 'Akcenty',
+    timbre_beep: 'Elektroniczny',
+    timbre_mechanical: 'Klasyczny mechaniczny',
+    timbre_soft: 'Subtelny',
   },
   en: {
     tagline: 'Audio → Bass → Tab',
@@ -987,6 +1193,9 @@ const I18N = {
     quant_8t: '1/8T (eighth triplets)',
     quant_16: '1/16 (sixteenth notes)',
     quant_16t: '1/16T (sixteenth triplets)',
+    set_engine: 'Transcription engine',
+    engine_pyin: 'librosa pyin (fast)',
+    engine_crepe: 'CREPE neural (accurate)',
     set_stem: 'What to extract',
     stem_vocals: 'Vocals (and instrumental)',
     stem_drums: 'Drums (and the rest)',
@@ -1046,6 +1255,12 @@ const I18N = {
     metro_start: 'Start',
     metro_stop: 'Stop',
     metro_tap: 'Tap tempo',
+    metro_timbre: 'Sound',
+    metro_meter: 'Time signature',
+    metro_accents: 'Accents',
+    timbre_beep: 'Electronic',
+    timbre_mechanical: 'Classic mechanical',
+    timbre_soft: 'Subtle',
   },
 };
 
@@ -1074,6 +1289,21 @@ document.querySelectorAll('.lang-btn').forEach(btn => {
   });
 });
 
+// Theme switcher
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.querySelectorAll('.theme-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.theme === theme));
+}
+
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const theme = btn.dataset.theme;
+    applyTheme(theme);
+    try { localStorage.setItem('basslift_theme', theme); } catch {}
+  });
+});
+
 // Mode tabs
 document.querySelectorAll('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -1093,6 +1323,7 @@ function applyMode() {
     el.style.display = isBass ? 'none' : '';
   });
   // Hide tab output if mode changes
+  stopAllAudio();
   $('tabOutput').classList.remove('show');
   applyLang();
 }
@@ -1111,7 +1342,14 @@ try {
     document.querySelectorAll('.mode-tab').forEach(t =>
       t.classList.toggle('active', t.dataset.mode === currentMode));
   }
+  const savedTheme = localStorage.getItem('basslift_theme');
+  if (savedTheme === 'light' || savedTheme === 'dark') {
+    applyTheme(savedTheme);
+  }
 } catch {}
+if (location.protocol === 'http:' || location.protocol === 'https:') {
+  $('backendUrl').value = location.origin;
+}
 applyMode();
 applyLang();
 
@@ -1146,6 +1384,7 @@ function setFile(f) {
 }
 
 $('fileRemove').addEventListener('click', () => {
+  stopAllAudio();
   selectedFile = null;
   fileInput.value = '';
   uploadArea.style.display = '';
@@ -1197,6 +1436,32 @@ $('instToggle').addEventListener('click', () => {
   $('instArrow').textContent = open ? '▲' : '▼';
 });
 
+// Settings collapse toggle
+$('settingsToggle').addEventListener('click', () => {
+  const b = $('settingsBody');
+  const open = b.classList.toggle('show');
+  $('settingsArrow').textContent = open ? '▲' : '▼';
+  try { localStorage.setItem('basslift_settings_open', open ? '1' : '0'); } catch {}
+});
+
+try {
+  if (localStorage.getItem('basslift_settings_open') === '1') {
+    $('settingsBody').classList.add('show');
+    $('settingsArrow').textContent = '▲';
+  }
+} catch {}
+
+// Persist transcription engine selection
+$('transcriptionEngine').addEventListener('change', e => {
+  try { localStorage.setItem('basslift_engine', e.target.value); } catch {}
+});
+try {
+  const savedEngine = localStorage.getItem('basslift_engine');
+  if (savedEngine === 'pyin' || savedEngine === 'crepe') {
+    $('transcriptionEngine').value = savedEngine;
+  }
+} catch {}
+
 // Steps
 function getSteps() {
   if (currentMode === 'vocal') {
@@ -1242,6 +1507,7 @@ function setProgress(pct) {
 // Run
 $('runBtn').addEventListener('click', async () => {
   showError('');
+  stopAllAudio();
   $('tabOutput').classList.remove('show');
   $('progressArea').classList.add('show');
   $('runBtn').disabled = true;
@@ -1278,6 +1544,7 @@ async function runBassExtract(url) {
   fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
   fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
   fd.append('quantize', $('quantizeMode').value);
+  fd.append('transcription_engine', $('transcriptionEngine').value);
 
   renderSteps('sep', []);
   setProgress(5);
@@ -1498,6 +1765,10 @@ let metroNextNoteTime = 0;
 let metroBpm = 120;
 let metroTapTimes = [];
 let metroTapTimeout = null;
+let metroTimbre = 'beep';                  // 'beep' | 'mechanical' | 'soft'
+let metroMeter = { beats: 4, denom: 4 };
+let metroAccents = new Set([1]);           // 1-based beat numbers
+let metroBeatInMeasure = 0;                // 0-based scheduling counter
 
 const METRO_SCHEDULE_AHEAD = 0.1;
 const METRO_SCHEDULE_INTERVAL = 25;
@@ -1508,14 +1779,16 @@ function clampBpm(v) {
   return Math.max(30, Math.min(300, v));
 }
 
-function metroPlayClick(time) {
+function clickBeep(time, acc) {
   const ctx = metroAudioCtx;
   const osc = ctx.createOscillator();
   osc.type = 'sine';
-  osc.frequency.setValueAtTime(880, time);
-  osc.frequency.exponentialRampToValueAtTime(440, time + 0.04);
+  const startF = acc ? 1760 : 880;
+  const endF = acc ? 880 : 440;
+  osc.frequency.setValueAtTime(startF, time);
+  osc.frequency.exponentialRampToValueAtTime(endF, time + 0.04);
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.7, time);
+  gain.gain.setValueAtTime(acc ? 1.0 : 0.7, time);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -1523,12 +1796,60 @@ function metroPlayClick(time) {
   osc.stop(time + 0.07);
 }
 
-function metroScheduleBeatFlash(audioTime) {
+function clickMechanical(time, acc) {
+  const ctx = metroAudioCtx;
+  const dur = 0.05;
+  // Krótki burst białego szumu — drewniany "tick"
+  const noise = ctx.createBufferSource();
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  noise.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = acc ? 3200 : 2000;
+  bp.Q.value = 4;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(acc ? 0.9 : 0.6, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+  noise.connect(bp);
+  bp.connect(g);
+  g.connect(ctx.destination);
+  noise.start(time);
+  noise.stop(time + dur);
+}
+
+function clickSoft(time, acc) {
+  const ctx = metroAudioCtx;
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(acc ? 1200 : 600, time);
+  const g = ctx.createGain();
+  const peak = acc ? 0.45 : 0.25;
+  g.gain.setValueAtTime(0, time);
+  g.gain.linearRampToValueAtTime(peak, time + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.1);
+}
+
+function metroPlayClick(time, accented) {
+  const fn = { beep: clickBeep, mechanical: clickMechanical, soft: clickSoft }[metroTimbre] || clickBeep;
+  fn(time, accented);
+}
+
+function metroScheduleBeatFlash(audioTime, accented) {
   const delay = (audioTime - metroAudioCtx.currentTime) * 1000;
   setTimeout(() => {
     const indicator = $('metroBeatIndicator');
     indicator.classList.add('beat');
-    setTimeout(() => indicator.classList.remove('beat'), 100);
+    if (accented) indicator.classList.add('beat-accent');
+    setTimeout(() => {
+      indicator.classList.remove('beat');
+      indicator.classList.remove('beat-accent');
+    }, 100);
   }, Math.max(0, delay));
 }
 
@@ -1536,9 +1857,12 @@ function metroScheduler() {
   if (!metroRunning) return;
   const secondsPerBeat = 60.0 / metroBpm;
   while (metroNextNoteTime < metroAudioCtx.currentTime + METRO_SCHEDULE_AHEAD) {
-    metroPlayClick(metroNextNoteTime);
-    metroScheduleBeatFlash(metroNextNoteTime);
+    const beatNumber = (metroBeatInMeasure % metroMeter.beats) + 1;
+    const accented = metroAccents.has(beatNumber);
+    metroPlayClick(metroNextNoteTime, accented);
+    metroScheduleBeatFlash(metroNextNoteTime, accented);
     metroNextNoteTime += secondsPerBeat;
+    metroBeatInMeasure = (metroBeatInMeasure + 1) % metroMeter.beats;
   }
   metroTimerID = setTimeout(metroScheduler, METRO_SCHEDULE_INTERVAL);
 }
@@ -1554,6 +1878,7 @@ function metroStart() {
   metroBpm = clampBpm(parseInt($('metroBpm').value) || 120);
   $('metroBpm').value = metroBpm;
   metroRunning = true;
+  metroBeatInMeasure = 0;
   metroNextNoteTime = metroAudioCtx.currentTime + 0.05;
   metroScheduler();
   $('metroStartBtn').textContent = t('metro_stop');
@@ -1605,6 +1930,40 @@ $('metroBpm').addEventListener('input', () => {
   const val = parseInt($('metroBpm').value);
   if (val >= 30 && val <= 300) metroBpm = val;
 });
+
+function renderMetroAccents() {
+  const wrap = $('metroAccents');
+  wrap.innerHTML = '';
+  for (let i = 1; i <= metroMeter.beats; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'metro-accent-btn' + (metroAccents.has(i) ? ' accented' : '');
+    b.textContent = i;
+    b.dataset.beat = i;
+    b.addEventListener('click', () => {
+      const n = parseInt(b.dataset.beat);
+      if (metroAccents.has(n)) metroAccents.delete(n);
+      else metroAccents.add(n);
+      b.classList.toggle('accented');
+    });
+    wrap.appendChild(b);
+  }
+}
+
+$('metroTimbre').addEventListener('change', e => {
+  metroTimbre = e.target.value;
+});
+
+$('metroMeter').addEventListener('change', e => {
+  const [b, d] = e.target.value.split('/').map(Number);
+  metroMeter = { beats: b, denom: d };
+  metroAccents = new Set([...metroAccents].filter(n => n <= b));
+  if (metroAccents.size === 0) metroAccents.add(1);
+  metroBeatInMeasure = 0;
+  renderMetroAccents();
+});
+
+renderMetroAccents();
 </script>
 </body>
 </html>

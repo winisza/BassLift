@@ -23,7 +23,9 @@ Everything runs locally on your machine. No audio is ever uploaded to a third-pa
 ## How it works
 
 - **Source separation:** [Demucs](https://github.com/facebookresearch/demucs) (Hybrid Transformer model, `htdemucs`)
-- **Pitch detection:** [librosa](https://librosa.org/) — probabilistic YIN (`pyin`) with median filtering, octave error correction, and adaptive confidence thresholds
+- **Pitch detection:** two engines, selectable in the UI:
+  - [librosa](https://librosa.org/) — probabilistic YIN (`pyin`) with median filtering, octave error correction, and adaptive confidence thresholds (default, fast)
+  - [CREPE](https://github.com/maxrmorrison/torchcrepe) — neural pitch tracker (torchcrepe, `full` model). Substantially more accurate for bass, especially in the low register. Downloads ~150 MB of model weights on first use. Uses GPU automatically when available.
 - **Backend:** FastAPI + Uvicorn
 - **Frontend:** single static HTML file (no build step)
 
