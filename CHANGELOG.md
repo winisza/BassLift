@@ -14,6 +14,10 @@ Ideas under consideration (no commitments):
 - 5-string bass support (B0 lowest)
 - Web UI hosted version (no local backend needed)
 
+## [0.4.0] - 2026-09-24
+
+Major update: native macOS app, one-click launcher, rebuilt transcription pipeline (beat tracking, onset-anchored notes, BS-RoFormer separation) with measured accuracy — note F1 on BabySlakh 0.41 → 0.71 — background jobs with real progress, and instant re-transcription.
+
 ### Added
 
 - **BassLift.app for macOS** (Apple Silicon, macOS 14+): native window (pywebview/WKWebView) with the server in-process, built with Briefcase by `scripts/build_macos_app.sh` into an ad-hoc-signed app (~1.3 GB) and DMG (~350 MB). Wheels for source-only dependencies are built locally; bytecode is precompiled so the running app never writes into its bundle
@@ -123,7 +127,8 @@ Major update: neural transcription engine (CREPE) alongside librosa pyin, one-cl
 - **Audio kept playing after tab switch / new extraction** — players were hidden via class removal but the underlying `<audio>` was never paused. Introduced `stopAllAudio()` and called it from: Run button handler, `applyMode()` (tab switch), and `fileRemove` handler
 - **Two players could play simultaneously** — added `play` listeners on every `<audio>` that pause all others on start, so a new player always stops the previous one
 
-[Unreleased]: https://github.com/winisza/BassLift/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/winisza/BassLift/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/winisza/BassLift/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/winisza/BassLift/compare/v0.2.0...v0.3.0
 
 ## [0.2.0] - 2026-05-18

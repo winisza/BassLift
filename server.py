@@ -21,7 +21,7 @@ from basslift import jobs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 log = logging.getLogger("basslift")
 
-app = FastAPI(title="BassLift", version="0.3.0")
+app = FastAPI(title="BassLift", version="0.4.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 ROOT_DIR = Path(__file__).parent
@@ -37,7 +37,7 @@ for static in ("logo", "fonts"):
     if (ROOT_DIR / static).is_dir():
         app.mount(f"/{static}", StaticFiles(directory=ROOT_DIR / static), name=static)
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 ALLOWED_SUFFIXES = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac"}
 
