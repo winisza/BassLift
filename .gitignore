@@ -75,3 +75,4 @@ logs/
 # Ewaluacja: zestawy danych i cache (duże, generowane/pobierane lokalnie)
 eval/data/
 eval/cache/
+.venv-build/

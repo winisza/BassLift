@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BassLift — Bass Tab Extractor</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Boldonse&display=swap');
+  @import url('fonts/fonts.css');  /* lokalne kopie Google Fonts — działa offline */
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -924,7 +924,7 @@
   </div>
 
   <!-- Backend -->
-  <div>
+  <div id="backendSection">
     <div class="section-label" data-i18n="sec_backend">03 — Połączenie z backendem</div>
     <div class="backend-status">
       <div class="status-dot" id="statusDot"></div>
@@ -1074,6 +1074,8 @@ let currentMode = 'bass';   // 'bass' | 'vocal'
 let currentLang = 'pl';
 // GUI serwowane przez backend (run.py) — adres jest znany, nie trzeba nic konfigurować
 const SERVED_BY_BACKEND = location.protocol === 'http:' || location.protocol === 'https:';
+// Natywne okno BassLift.app (pywebview) — zapis plików i schowek idą przez most do Pythona
+const IN_APP = new URLSearchParams(location.search).has('app');
 
 // ─── i18n ───
 const I18N = {
@@ -1367,6 +1369,9 @@ try {
     applyTheme(savedTheme);
   }
 } catch {}
+if (IN_APP) {
+  $('backendSection').style.display = 'none';  // w aplikacji serwer to jej część, nie ma czego pokazywać
+}
 if (SERVED_BY_BACKEND) {
   $('backendUrl').value = location.origin;
   $('backendUrl').style.display = 'none';
@@ -1447,7 +1452,10 @@ async function checkBackend() {
 $('checkBtn').addEventListener('click', checkBackend);
 
 // Heartbeat: run.py wyłącza serwer, gdy zamkniesz ostatnią kartę BassLift
-if (SERVED_BY_BACKEND) {
+// (w BassLift.app kończy go zamknięcie okna)
+if (SERVED_BY_BACKEND && IN_APP) {
+  checkBackend();
+} else if (SERVED_BY_BACKEND) {
   const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const beat = () => fetch('/api/heartbeat?client=' + clientId, { method: 'POST' })
     .then(r => { if (!r.ok) throw new Error(); if (!backendOk) checkBackend(); })
@@ -1755,10 +1763,7 @@ function showSplit(data, backendUrl) {
 }
 
 function downloadStem(url, id, filename) {
-  const a = document.createElement('a');
-  a.href = url + '/download/' + id;
-  a.download = filename;
-  a.click();
+  saveUrl(filename, '/download/' + id);
 }
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1843,47 +1848,65 @@ function showTab(data) {
   }
 }
 
-// Copy / download
+// Copy / download — w przeglądarce zwykłe pobieranie, w BassLift.app natywne „Zapisz jako”
+const bridge = () => (IN_APP && window.pywebview && window.pywebview.api) || null;
+const baseName = fallback => selectedFile?.name.replace(/\.[^.]+$/, '') || fallback;
+
+async function saveBlob(filename, blob) {
+  if (bridge()) {
+    const b64 = await new Promise(resolve => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result.split(',')[1]);
+      r.readAsDataURL(blob);
+    });
+    return bridge().save_file(filename, b64);
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function saveUrl(filename, path) {
+  if (bridge()) return bridge().save_download(filename, path);  // serwer lokalny, bez przesyłu przez JS
+  const a = document.createElement('a');
+  a.href = $('backendUrl').value.trim() + path;
+  a.download = filename;
+  a.click();
+}
+
+async function copyText(text) {
+  if (bridge()) return bridge().copy_text(text);
+  return navigator.clipboard.writeText(text);
+}
+
 $('copyBtn').addEventListener('click', () => {
-  if (tabData) navigator.clipboard.writeText(tabData).then(() => {
+  if (tabData) copyText(tabData).then(() => {
     $('copyBtn').textContent = t('btn_copied');
     setTimeout(() => $('copyBtn').textContent = t('btn_copy'), 1800);
   });
 });
 
 $('downloadTabBtn').addEventListener('click', () => {
-  if (!tabData) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([tabData], { type: 'text/plain' }));
-  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_tab.txt';
-  a.click();
+  if (tabData) saveBlob(baseName('bass') + '_tab.txt', new Blob([tabData], { type: 'text/plain' }));
 });
 
 $('downloadMidiBtn').addEventListener('click', () => {
-  if (!midiBlob) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(midiBlob);
-  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_bass.mid';
-  a.click();
+  if (midiBlob) saveBlob(baseName('bass') + '_bass.mid', midiBlob);
 });
 
 $('downloadMusicXmlBtn').addEventListener('click', () => {
-  if (!musicxmlBlob) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(musicxmlBlob);
-  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_bass.musicxml';
-  a.click();
+  if (musicxmlBlob) saveBlob(baseName('bass') + '_bass.musicxml', musicxmlBlob);
 });
 
 $('downloadBassBtn').addEventListener('click', () => {
   const id = $('downloadBassBtn').dataset.id;
-  if (!id) return;
-  const url = $('backendUrl').value.trim();
-  const a = document.createElement('a');
-  a.href = url + '/bass/' + id;
-  a.download = (selectedFile?.name.replace(/\.[^.]+$/, '') || 'bass') + '_isolated.wav';
-  a.click();
+  if (id) saveUrl(baseName('bass') + '_isolated.wav', '/bass/' + id);
 });
+
+// Upuszczenie pliku obok pola wgrywania nie może przenieść okna na ten plik
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
 
 // ─── Metronome ───
 let metroAudioCtx = null;
