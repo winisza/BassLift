@@ -71,3 +71,7 @@ logs/
 # Environment
 .env
 .env.local
+
+# Ewaluacja: zestawy danych i cache (duże, generowane/pobierane lokalnie)
+eval/data/
+eval/cache/

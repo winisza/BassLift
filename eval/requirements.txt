@@ -1,0 +1,4 @@
+# Tylko do ewaluacji (pip install -r eval/requirements.txt w .venv aplikacji)
+mir_eval>=0.8
+pretty_midi>=0.2.10
+pyyaml>=6

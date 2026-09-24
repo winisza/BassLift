@@ -861,7 +861,8 @@
       <div class="setting-card">
         <div class="setting-name" data-i18n="set_model">Model separacji (Demucs)</div>
         <select id="demucsModel">
-          <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (zalecany)</option>
+          <option value="bs_roformer_sw" selected data-i18n="model_roformer">BS-RoFormer SW (najcelniejszy)</option>
+          <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (szybki)</option>
           <option value="htdemucs_ft" data-i18n="model_htdemucs_ft">htdemucs_ft (fine-tuned)</option>
           <option value="mdx_extra" data-i18n="model_mdx">mdx_extra (wolniejszy)</option>
         </select>
@@ -869,8 +870,8 @@
       <div class="setting-card mode-bass-only">
         <div class="setting-name" data-i18n="set_engine">Silnik transkrypcji</div>
         <select id="transcriptionEngine">
-          <option value="pyin" data-i18n="engine_pyin">librosa pyin (szybki)</option>
-          <option value="crepe" data-i18n="engine_crepe">CREPE neural (celny)</option>
+          <option value="crepe" data-i18n="engine_crepe">CREPE neural (celny, zalecany)</option>
+          <option value="pyin" data-i18n="engine_pyin">librosa pyin (szybszy)</option>
         </select>
       </div>
       <div class="setting-card mode-bass-only">
@@ -902,9 +903,10 @@
       <div class="setting-card mode-bass-only">
         <div class="setting-name" data-i18n="set_quantize">Siatka kwantyzacji</div>
         <select id="quantizeMode">
+          <option value="auto" selected data-i18n="quant_auto">Auto (1/16 lub triole)</option>
           <option value="8" data-i18n="quant_8">1/8 (ósemki)</option>
           <option value="8t" data-i18n="quant_8t">1/8T (triole ósemkowe)</option>
-          <option value="16" selected data-i18n="quant_16">1/16 (szesnastki)</option>
+          <option value="16" data-i18n="quant_16">1/16 (szesnastki)</option>
           <option value="16t" data-i18n="quant_16t">1/16T (triole szesnastkowe)</option>
         </select>
       </div>
@@ -1013,24 +1015,22 @@
   </div>
 
   <!-- Instructions -->
-  <div class="instructions">
+  <div class="instructions" id="instructions">
     <div class="instructions-header" id="instToggle">
-      <span style="color:var(--accent)">?</span> <span data-i18n="inst_header">Jak uruchomić backend lokalnie</span>
+      <span style="color:var(--accent)">?</span> <span data-i18n="inst_header">Jak uruchomić BassLift</span>
       <span id="instArrow" style="margin-left:auto">▼</span>
     </div>
     <div class="instructions-body" id="instBody">
-      <div class="inst-step"><strong data-i18n="inst_req">Wymagania:</strong> <span data-i18n="inst_req_desc">Python 3.9+, pip, ok. 4 GB RAM</span></div>
+      <div class="inst-step"><strong data-i18n="inst_req">Wymagania:</strong> <span data-i18n="inst_req_desc">Python 3.10+, ok. 4 GB RAM</span></div>
       <br>
-      <div class="inst-step"><strong>1. <span data-i18n="inst_step1">Instalacja zależności</span></strong></div>
-      <div class="code-block">pip install fastapi uvicorn python-multipart \
-    demucs librosa midiutil python-dotenv</div>
+      <div class="inst-step"><strong>1. <span data-i18n="inst_step1">Uruchom dwuklikiem</span></strong></div>
+      <div class="code-block">macOS:    BassLift.command
+Windows:  BassLift.bat
+terminal: python run.py</div>
 
-      <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Uruchomienie serwera</span></strong></div>
-      <div class="code-block">uvicorn server:app --reload --port 8000</div>
-
-      <div class="inst-step"><strong>3. <span data-i18n="inst_step3">Pobierz kod serwera</span></strong> — <span data-i18n="inst_step3_desc">plik <span style="color:var(--accent)">server.py</span> jest dostępny w repozytorium GitHub.</span></div>
+      <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Aplikacja otworzy się w przeglądarce</span></strong> — <span data-i18n="inst_step2_desc">zamknięcie karty wyłącza serwer.</span></div>
       <br>
-      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie pobiera model Demucs (~300 MB). Kolejne są szybsze.</div>
+      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie instaluje zależności (kilka minut), a pierwsza ekstrakcja pobiera model separacji (~700 MB).</div>
     </div>
   </div>
 
@@ -1067,10 +1067,13 @@ document.addEventListener('DOMContentLoaded', () => {
 let selectedFile = null;
 let inputObjectUrl = null;
 let tabData = null;
+let lastJobId = null;   // zadanie, którego analizę da się przeliczyć z innymi ustawieniami
 let midiBlob = null;
 let musicxmlBlob = null;
 let currentMode = 'bass';   // 'bass' | 'vocal'
 let currentLang = 'pl';
+// GUI serwowane przez backend (run.py) — adres jest znany, nie trzeba nic konfigurować
+const SERVED_BY_BACKEND = location.protocol === 'http:' || location.protocol === 'https:';
 
 // ─── i18n ───
 const I18N = {
@@ -1084,8 +1087,9 @@ const I18N = {
     upload_title: 'Upuść plik audio tutaj',
     upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
     sec_settings: '02 — Ustawienia',
-    set_model: 'Model separacji (Demucs)',
-    model_htdemucs: 'htdemucs (zalecany)',
+    set_model: 'Model separacji',
+    model_roformer: 'BS-RoFormer SW (najcelniejszy)',
+    model_htdemucs: 'htdemucs (szybki)',
     model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
     model_mdx: 'mdx_extra (wolniejszy)',
     set_threshold: 'Próg pewności detekcji',
@@ -1095,13 +1099,14 @@ const I18N = {
     set_export_midi: 'Eksportuj MIDI',
     set_export_bass: 'Pobierz izolowany bas (WAV)',
     set_quantize: 'Siatka kwantyzacji',
+    quant_auto: 'Auto (1/16 lub triole)',
     quant_8: '1/8 (ósemki)',
     quant_8t: '1/8T (triole ósemkowe)',
     quant_16: '1/16 (szesnastki)',
     quant_16t: '1/16T (triole szesnastkowe)',
     set_engine: 'Silnik transkrypcji',
-    engine_pyin: 'librosa pyin (szybki)',
-    engine_crepe: 'CREPE neural (celny)',
+    engine_pyin: 'librosa pyin (szybszy)',
+    engine_crepe: 'CREPE neural (celny, zalecany)',
     set_stem: 'Co wyciągnąć',
     stem_vocals: 'Wokal (i instrumental)',
     stem_drums: 'Perkusja (i reszta)',
@@ -1120,19 +1125,24 @@ const I18N = {
     btn_download_midi: 'Pobierz MIDI',
     btn_download_musicxml: 'Pobierz MusicXML',
     btn_download_bass: 'Pobierz bas (WAV)',
-    inst_header: 'Jak uruchomić backend lokalnie',
+    status_closed: 'BassLift został zamknięty — uruchom go ponownie',
+    inst_header: 'Jak uruchomić BassLift',
     inst_req: 'Wymagania:',
-    inst_req_desc: 'Python 3.9+, pip, ok. 4 GB RAM',
-    inst_step1: 'Instalacja zależności',
-    inst_step2: 'Uruchomienie serwera',
-    inst_step3: 'Pobierz kod serwera',
-    inst_step3_desc: 'plik server.py jest dostępny w repozytorium GitHub.',
-    inst_note: 'Pierwsze uruchomienie pobiera model Demucs (~300 MB). Dla przyspieszenia 8-15× zainstaluj PyTorch z CUDA (NVIDIA) — na Apple Silicon MPS działa od razu. Szczegóły w README.',
+    inst_req_desc: 'Python 3.10+, ok. 4 GB RAM',
+    inst_step1: 'Uruchom dwuklikiem',
+    inst_step2: 'Aplikacja otworzy się w przeglądarce',
+    inst_step2_desc: 'zamknięcie karty wyłącza serwer.',
+    inst_note: 'Pierwsze uruchomienie instaluje zależności (kilka minut), a pierwsza ekstrakcja pobiera model separacji (~700 MB). Kolejne starty są szybkie. GPU NVIDIA i Apple Silicon są używane automatycznie.',
     footer: 'BassLift · działa lokalnie · dane nie opuszczają Twojego komputera',
-    step_sep: 'Separacja basu (Demucs)',
-    step_sep_vocal: 'Separacja źródeł (Demucs)',
-    step_midi: 'Transkrypcja audio → nuty (librosa pyin)',
+    step_sep: 'Separacja basu ({x})',
+    step_sep_vocal: 'Separacja źródeł ({x})',
+    step_midi: 'Transkrypcja audio → nuty ({x})',
     step_tab: 'Generowanie tabulatury',
+    step_queued: 'czeka w kolejce',
+    step_download: 'pobieranie modelu (~700 MB, tylko za pierwszym razem)',
+    meta_sep_fallback: '⚠ BS-RoFormer niedostępny — użyto htdemucs',
+    step_uploading: 'wysyłanie pliku',
+    meta_fallback: '⚠ bas słabo wydzielony — wynik mniej pewny',
     meta_bpm: 'BPM: ',
     meta_notes: 'Nuty: ',
     meta_dur: 'Czas: ',
@@ -1153,6 +1163,7 @@ const I18N = {
     name_no_drums: 'resztę (bez perkusji)',
     name_no_other: 'resztę',
     meta_timesig: 'Metrum: ',
+    meta_rec_tuning: 'Nagranie: {x} centów od A=440',
     player_input: 'Podgląd pliku wejściowego',
     player_bass: 'Izolowany bas',
     player_target: 'Odtwórz {x}',
@@ -1178,8 +1189,9 @@ const I18N = {
     upload_title: 'Drop your audio file here',
     upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
     sec_settings: '02 — Settings',
-    set_model: 'Separation model (Demucs)',
-    model_htdemucs: 'htdemucs (recommended)',
+    set_model: 'Separation model',
+    model_roformer: 'BS-RoFormer SW (most accurate)',
+    model_htdemucs: 'htdemucs (fast)',
     model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
     model_mdx: 'mdx_extra (slower)',
     set_threshold: 'Detection confidence threshold',
@@ -1189,13 +1201,14 @@ const I18N = {
     set_export_midi: 'Export MIDI',
     set_export_bass: 'Download isolated bass (WAV)',
     set_quantize: 'Quantization grid',
+    quant_auto: 'Auto (1/16 or triplets)',
     quant_8: '1/8 (eighth notes)',
     quant_8t: '1/8T (eighth triplets)',
     quant_16: '1/16 (sixteenth notes)',
     quant_16t: '1/16T (sixteenth triplets)',
     set_engine: 'Transcription engine',
-    engine_pyin: 'librosa pyin (fast)',
-    engine_crepe: 'CREPE neural (accurate)',
+    engine_pyin: 'librosa pyin (faster)',
+    engine_crepe: 'CREPE neural (accurate, recommended)',
     set_stem: 'What to extract',
     stem_vocals: 'Vocals (and instrumental)',
     stem_drums: 'Drums (and the rest)',
@@ -1214,19 +1227,24 @@ const I18N = {
     btn_download_midi: 'Download MIDI',
     btn_download_musicxml: 'Download MusicXML',
     btn_download_bass: 'Download bass (WAV)',
-    inst_header: 'How to run the backend locally',
+    status_closed: 'BassLift has been closed — launch it again',
+    inst_header: 'How to run BassLift',
     inst_req: 'Requirements:',
-    inst_req_desc: 'Python 3.9+, pip, ~4 GB RAM',
-    inst_step1: 'Install dependencies',
-    inst_step2: 'Start the server',
-    inst_step3: 'Get the server code',
-    inst_step3_desc: 'the server.py file is available in the GitHub repository.',
-    inst_note: 'First run downloads the Demucs model (~300 MB). For 8-15× speedup install PyTorch with CUDA (NVIDIA) — Apple Silicon MPS works out of the box. See README for details.',
+    inst_req_desc: 'Python 3.10+, ~4 GB RAM',
+    inst_step1: 'Double-click to launch',
+    inst_step2: 'The app opens in your browser',
+    inst_step2_desc: 'closing the tab shuts the server down.',
+    inst_note: 'First run installs dependencies (a few minutes); the first extraction downloads the separation model (~700 MB). Later starts are fast. NVIDIA GPUs and Apple Silicon are used automatically.',
     footer: 'BassLift · runs locally · your data never leaves your computer',
-    step_sep: 'Bass separation (Demucs)',
-    step_sep_vocal: 'Source separation (Demucs)',
-    step_midi: 'Audio → notes transcription (librosa pyin)',
+    step_sep: 'Bass separation ({x})',
+    step_sep_vocal: 'Source separation ({x})',
+    step_midi: 'Audio → notes transcription ({x})',
     step_tab: 'Generating tablature',
+    step_queued: 'queued',
+    step_download: 'downloading the model (~700 MB, first run only)',
+    meta_sep_fallback: '⚠ BS-RoFormer unavailable — used htdemucs',
+    step_uploading: 'uploading',
+    meta_fallback: '⚠ bass poorly separated — less reliable',
     meta_bpm: 'BPM: ',
     meta_notes: 'Notes: ',
     meta_dur: 'Duration: ',
@@ -1247,6 +1265,7 @@ const I18N = {
     name_no_drums: 'rest (no drums)',
     name_no_other: 'rest',
     meta_timesig: 'Time sig: ',
+    meta_rec_tuning: 'Recording: {x} cents from A=440',
     player_input: 'Input file preview',
     player_bass: 'Isolated bass',
     player_target: 'Play {x}',
@@ -1323,6 +1342,7 @@ function applyMode() {
     el.style.display = isBass ? 'none' : '';
   });
   // Hide tab output if mode changes
+  lastJobId = null;
   stopAllAudio();
   $('tabOutput').classList.remove('show');
   applyLang();
@@ -1347,8 +1367,11 @@ try {
     applyTheme(savedTheme);
   }
 } catch {}
-if (location.protocol === 'http:' || location.protocol === 'https:') {
+if (SERVED_BY_BACKEND) {
   $('backendUrl').value = location.origin;
+  $('backendUrl').style.display = 'none';
+  $('checkBtn').style.display = 'none';
+  $('instructions').style.display = 'none';
 }
 applyMode();
 applyLang();
@@ -1372,6 +1395,7 @@ uploadArea.addEventListener('drop', e => {
 
 function setFile(f) {
   selectedFile = f;
+  lastJobId = null;
   $('fileName').textContent = f.name;
   $('fileSize').textContent = (f.size / 1048576).toFixed(2) + ' MB';
   uploadArea.style.display = 'none';
@@ -1386,6 +1410,7 @@ function setFile(f) {
 $('fileRemove').addEventListener('click', () => {
   stopAllAudio();
   selectedFile = null;
+  lastJobId = null;
   fileInput.value = '';
   uploadArea.style.display = '';
   fileChosen.classList.remove('show');
@@ -1413,13 +1438,27 @@ async function checkBackend() {
     } else { throw new Error(); }
   } catch {
     $('statusDot').className = 'status-dot err';
-    $('statusText').textContent = t('status_err');
+    $('statusText').textContent = t(SERVED_BY_BACKEND ? 'status_closed' : 'status_err');
     backendOk = false;
   }
   checkRunnable();
 }
 
 $('checkBtn').addEventListener('click', checkBackend);
+
+// Heartbeat: run.py wyłącza serwer, gdy zamkniesz ostatnią kartę BassLift
+if (SERVED_BY_BACKEND) {
+  const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const beat = () => fetch('/api/heartbeat?client=' + clientId, { method: 'POST' })
+    .then(r => { if (!r.ok) throw new Error(); if (!backendOk) checkBackend(); })
+    .catch(() => { if (backendOk) checkBackend(); });
+  checkBackend();
+  beat();
+  setInterval(beat, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) beat(); });
+  window.addEventListener('pagehide', () => navigator.sendBeacon('/api/bye?client=' + clientId));
+}
 
 $('noteThreshold').addEventListener('input', e => {
   $('thresholdVal').textContent = e.target.value;
@@ -1464,17 +1503,19 @@ try {
 
 // Steps
 function getSteps() {
+  const model = $('demucsModel').value === 'bs_roformer_sw' ? 'BS-RoFormer' : 'Demucs';
   if (currentMode === 'vocal') {
-    return [{ id: 'sep', label: t('step_sep_vocal') }];
+    return [{ id: 'sep', label: t('step_sep_vocal').replace('{x}', model) }];
   }
   return [
-    { id: 'sep',  label: t('step_sep') },
-    { id: 'midi', label: t('step_midi') },
+    { id: 'sep',  label: t('step_sep').replace('{x}', model) },
+    { id: 'midi', label: t('step_midi').replace('{x}',
+        $('transcriptionEngine').value === 'crepe' ? 'CREPE' : 'librosa pyin') },
     { id: 'tab',  label: t('step_tab') },
   ];
 }
 
-function renderSteps(activeId, doneIds = [], errId = null) {
+function renderSteps(activeId, doneIds = [], errId = null, note = '') {
   const list = $('stepList');
   list.innerHTML = '';
   getSteps().forEach(s => {
@@ -1494,7 +1535,7 @@ function renderSteps(activeId, doneIds = [], errId = null) {
       div.appendChild(icon);
     }
     const lbl = document.createElement('span');
-    lbl.textContent = s.label;
+    lbl.textContent = s.label + (active && note ? ' · ' + note : '');
     div.appendChild(lbl);
     list.appendChild(div);
   });
@@ -1502,6 +1543,65 @@ function renderSteps(activeId, doneIds = [], errId = null) {
 
 function setProgress(pct) {
   $('progressBar').style.width = pct + '%';
+}
+
+// Etap zadania na serwerze -> krok na liście
+const STAGE_STEP = { queued: 'sep', download: 'sep', separation: 'sep', saving: 'sep',
+                     beats: 'midi', pitch: 'midi', notation: 'tab' };
+const STEP_ORDER = ['sep', 'midi', 'tab'];
+
+function showJobProgress(job, alreadyDone = []) {
+  let step = STAGE_STEP[job.stage] || 'sep';
+  while (alreadyDone.includes(step) && step !== 'tab') step = STEP_ORDER[STEP_ORDER.indexOf(step) + 1];
+  const done = [...new Set([...alreadyDone, ...STEP_ORDER.slice(0, STEP_ORDER.indexOf(step))])];
+  // librosa.pyin nie raportuje postępu — sam etap zamiast zamrożonego „0%”
+  const silent = job.stage === 'pitch' && $('transcriptionEngine').value === 'pyin';
+  const note = job.state === 'queued' ? t('step_queued')
+    : job.stage === 'download' ? t('step_download')
+    : silent ? '' : Math.round(job.progress * 100) + '%';
+  renderSteps(step, done, null, note);
+  setProgress(Math.max(2, job.progress * 100));
+}
+
+async function finishProgress(done, pause = 250) {
+  renderSteps(null, done);
+  setProgress(100);
+  if (pause) await delay(pause);
+  $('progressArea').classList.remove('show');
+  setProgress(0);
+}
+
+async function apiJson(res) {
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
+    const e = new Error(err.detail || 'HTTP ' + res.status);
+    e.status = res.status;
+    throw e;
+  }
+  return res.json();
+}
+
+// Odpytuje zadanie do końca: postęp na żywo, zwraca wynik albo rzuca błąd
+async function pollJob(url, jobId, alreadyDone = []) {
+  for (let attempt = 0; ; attempt++) {
+    const job = await apiJson(await fetch(url + '/api/jobs/' + jobId));
+    if (job.state === 'done') return job.result;
+    if (job.state === 'error') throw new Error(job.error || t('err_unknown'));
+    showJobProgress(job, alreadyDone);
+    await delay(attempt < 5 ? 80 : 400);  // szybkie przeliczenia kończą się w ułamku sekundy
+  }
+}
+
+// Ustawienia, które można zmienić po ekstrakcji bez ponownej separacji
+function settingsForm() {
+  const fd = new FormData();
+  fd.append('note_threshold', $('noteThreshold').value);
+  fd.append('tuning', [$('t1'), $('t2'), $('t3'), $('t4')].map(i => i.value.toUpperCase()).join(','));
+  fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
+  fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
+  fd.append('quantize', $('quantizeMode').value);
+  fd.append('transcription_engine', $('transcriptionEngine').value);
+  return fd;
 }
 
 // Run
@@ -1536,41 +1636,20 @@ $('runBtn').addEventListener('click', async () => {
 });
 
 async function runBassExtract(url) {
-  const fd = new FormData();
+  const fd = settingsForm();
   fd.append('file', selectedFile);
+  fd.append('kind', 'extract');
   fd.append('demucs_model', $('demucsModel').value);
-  fd.append('note_threshold', $('noteThreshold').value);
-  fd.append('tuning', [$('t1'), $('t2'), $('t3'), $('t4')].map(i => i.value.toUpperCase()).join(','));
-  fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
-  fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
-  fd.append('quantize', $('quantizeMode').value);
-  fd.append('transcription_engine', $('transcriptionEngine').value);
-
-  renderSteps('sep', []);
-  setProgress(5);
+  lastJobId = null;
+  renderSteps('sep', [], null, t('step_uploading'));
+  setProgress(1);
 
   try {
-    const res = await fetch(url + '/extract', { method: 'POST', body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
-      throw new Error(err.detail || 'HTTP ' + res.status);
-    }
-    renderSteps('midi', ['sep']);
-    setProgress(50);
-    await delay(300);
-    renderSteps('tab', ['sep', 'midi']);
-    setProgress(85);
-    await delay(300);
-
-    const data = await res.json();
-    renderSteps(null, ['sep', 'midi', 'tab']);
-    setProgress(100);
-    tabData = data.tab;
-    await delay(400);
-
+    const { job_id } = await apiJson(await fetch(url + '/api/jobs', { method: 'POST', body: fd }));
+    const data = await pollJob(url, job_id);
+    await finishProgress(['sep', 'midi', 'tab']);
+    lastJobId = data.job_id;
     showTab(data);
-    $('progressArea').classList.remove('show');
-    $('progressBar').style.width = '0%';
   } catch (e) {
     renderSteps(null, [], 'sep');
     showError(t('err_prefix') + e.message);
@@ -1580,31 +1659,62 @@ async function runBassExtract(url) {
 async function runVocalSplit(url) {
   const fd = new FormData();
   fd.append('file', selectedFile);
+  fd.append('kind', 'separate');
   fd.append('demucs_model', $('demucsModel').value);
   fd.append('stem', $('stemSelect').value);
-
-  renderSteps('sep', []);
-  setProgress(10);
+  renderSteps('sep', [], null, t('step_uploading'));
+  setProgress(1);
 
   try {
-    const res = await fetch(url + '/separate', { method: 'POST', body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
-      throw new Error(err.detail || 'HTTP ' + res.status);
-    }
-    setProgress(90);
-    const data = await res.json();
-    renderSteps(null, ['sep']);
-    setProgress(100);
-    await delay(400);
+    const { job_id } = await apiJson(await fetch(url + '/api/jobs', { method: 'POST', body: fd }));
+    const data = await pollJob(url, job_id);
+    await finishProgress(['sep']);
     showSplit(data, url);
-    $('progressArea').classList.remove('show');
-    $('progressBar').style.width = '0%';
   } catch (e) {
     renderSteps(null, [], 'sep');
     showError(t('err_prefix') + e.message);
   }
 }
+
+// Zmiana ustawień po ekstrakcji: przelicz z analizy zapamiętanej na serwerze
+// (próg, siatka, strój — ułamek sekundy; inny silnik — tylko nowy tor wysokości)
+let retranscribeTimer = null;
+let retranscribeRunning = false;
+let retranscribePending = false;
+
+function scheduleRetranscribe() {
+  if (!lastJobId || currentMode !== 'bass' || !$('tabOutput').classList.contains('show')) return;
+  clearTimeout(retranscribeTimer);
+  retranscribeTimer = setTimeout(runRetranscribe, 150);
+}
+
+async function runRetranscribe() {
+  if (retranscribeRunning) { retranscribePending = true; return; }
+  retranscribeRunning = true;
+  const url = $('backendUrl').value.trim();
+  showError('');
+  $('progressArea').classList.add('show');
+  $('runBtn').disabled = true;
+  try {
+    const res = await fetch(url + '/api/jobs/' + lastJobId + '/retranscribe', { method: 'POST', body: settingsForm() });
+    const { job_id } = await apiJson(res);
+    const data = await pollJob(url, job_id, ['sep']);
+    await finishProgress(['sep', 'midi', 'tab'], 0);
+    lastJobId = data.job_id;
+    showTab(data);
+  } catch (e) {
+    $('progressArea').classList.remove('show');
+    if (e.status === 404) lastJobId = null;
+    showError(t('err_prefix') + e.message);
+  }
+  retranscribeRunning = false;
+  $('runBtn').disabled = false;
+  checkRunnable();
+  if (retranscribePending) { retranscribePending = false; runRetranscribe(); }
+}
+
+['noteThreshold', 'quantizeMode', 't1', 't2', 't3', 't4', 'transcriptionEngine', 'exportMidi', 'exportBass']
+  .forEach(id => $(id).addEventListener('change', scheduleRetranscribe));
 
 function showSplit(data, backendUrl) {
   // Meta pills: stem name + accompaniment
@@ -1668,10 +1778,20 @@ function showTab(data) {
     { label: t('meta_notes') + (data.note_count || '?') },
     { label: t('meta_dur') + (data.duration || '?') + 's' },
     { label: t('meta_tuning') + (data.tuning || 'EADG') },
-    { label: t('meta_grid') + ($('quantizeMode').selectedOptions[0]?.text || '1/16') },
+    { label: t('meta_grid') + (data.grid || $('quantizeMode').selectedOptions[0]?.text || '1/16') },
   ];
   if (data.time_sig) {
     pills.push({ label: t('meta_timesig') + data.time_sig + '/4' });
+  }
+  if (Math.abs(data.tuning_cents || 0) >= 10) {
+    const c = Math.round(data.tuning_cents);
+    pills.push({ label: t('meta_rec_tuning').replace('{x}', (c > 0 ? '+' : '') + c) });
+  }
+  if (data.separation_fallback) {
+    pills.push({ label: t('meta_fallback') });
+  }
+  if (data.separation_model && data.separation_model !== $('demucsModel').value) {
+    pills.push({ label: t('meta_sep_fallback') });
   }
   pills.forEach(p => {
     const span = document.createElement('span');
@@ -1684,6 +1804,9 @@ function showTab(data) {
   $('tabPre').textContent = data.tab || '— brak danych —';
   $('tabOutput').classList.add('show');
 
+  tabData = data.tab;
+  midiBlob = null;
+  $('downloadMidiBtn').style.display = 'none';
   if (data.midi_b64) {
     const bytes = atob(data.midi_b64);
     const arr = new Uint8Array(bytes.length);
@@ -1692,6 +1815,8 @@ function showTab(data) {
     $('downloadMidiBtn').style.display = '';
   }
 
+  musicxmlBlob = null;
+  $('downloadMusicXmlBtn').style.display = 'none';
   if (data.musicxml_b64) {
     const bytes = atob(data.musicxml_b64);
     const arr = new Uint8Array(bytes.length);
@@ -1700,12 +1825,15 @@ function showTab(data) {
     $('downloadMusicXmlBtn').style.display = '';
   }
 
+  $('downloadBassBtn').style.display = data.bass_download_id ? '' : 'none';
+  $('outputPlayerBass').classList.toggle('show', !!data.bass_download_id);
   if (data.bass_download_id) {
     $('downloadBassBtn').dataset.id = data.bass_download_id;
-    $('downloadBassBtn').style.display = '';
     const bassUrl = $('backendUrl').value.trim() + '/bass/' + data.bass_download_id;
-    $('outputAudioBass').src = bassUrl;
-    $('outputPlayerBass').classList.add('show');
+    // ten sam plik po ponownej transkrypcji — nie przerywaj odtwarzania
+    if (!$('outputAudioBass').src.endsWith('/bass/' + data.bass_download_id)) {
+      $('outputAudioBass').src = bassUrl;
+    }
   }
 
   // Auto-fill metronome BPM from extraction

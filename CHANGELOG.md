@@ -14,6 +14,50 @@ Ideas under consideration (no commitments):
 - 5-string bass support (B0 lowest)
 - Web UI hosted version (no local backend needed)
 
+### Added
+
+- True one-click start: `BassLift.command` (macOS/Linux) and `BassLift.bat` (Windows) run `run.py`, which on first launch creates `.venv` and installs `requirements.txt` (CUDA PyTorch on NVIDIA machines), reuses a running instance, falls back to a free port if 8000 is taken, and opens the browser once the server is actually up
+- Auto-shutdown: the page sends heartbeats (`POST /api/heartbeat`, `POST /api/bye` on tab close); `run.py` stops the server when no BassLift tab is open and no job is running
+- `run.py --no-browser`
+- Beat and downbeat tracking with `beat_this` on the full mix: bar lines follow the song, tempo changes don't drift the grid, meter from downbeats (half-bar, half-time and shuffle-in-triplets corrections)
+- Quantization to subdivisions of the detected beats; new default grid **Auto** (1/16, or 1/8T for clearly swung songs); `grid` field in the `/extract` response
+- Onset-anchored note segmentation: repeated notes split at bass onsets, note starts pulled to the onset (pitch trackers react 50–140 ms late)
+- Whole-recording tuning estimation (A≠440), shown in the UI when it is ≥ 10 cents; `tuning_cents` in the response
+- Tab fingering optimised over the whole phrase (Viterbi) instead of note by note; tab wrapped into systems; correct octaves for drop D/C and B-E-A-D tunings
+- MIDI tempo map (bar by bar) and time signature; MusicXML ties across bar lines, dotted and triplet values
+- Fallback when Demucs "loses" the bass (bass < 15 % of mix energy): transcribe the low band of bass + other
+- `basslift/` package (`separation`, `rhythm`, `transcribe`, `notation`); `server.py` is HTTP only
+- Background jobs with real progress: `POST /api/jobs`, `GET /api/jobs/{id}` (stage + fraction from Demucs chunks and CREPE batches); the UI polls instead of waiting on one long request
+- Re-transcription without re-separation: `POST /api/jobs/{id}/retranscribe`; in the UI, changing threshold, grid, tuning or exports updates the tab in < 1 s, switching the engine re-runs only the pitch tracker
+- One heavy job at a time (queue) to keep RAM bounded; jobs and files expire 30 min after last use
+- Warning pill when the bass-separation fallback was used
+- **BS-RoFormer SW** as the default separation model (via `audio-separator`): note F1 on BabySlakh 0.59 → 0.71, no lost-bass songs; htdemucs stays as the fast option and as automatic fallback when `audio-separator` is unavailable. Model (~700 MB) downloaded once to `~/.cache/basslift/models`, with a "downloading" stage in the UI; progress reported per chunk
+- Bundled ffmpeg (`imageio-ffmpeg`) put on `PATH` for the separator — no system install; m4a/aac input now works
+- `eval/`: synthetic test-set generator and evaluator (mir_eval note F1, beat/downbeat F, meter, tempo) for the synthetic set and BabySlakh, with a baseline comparison mode; `tests/` unit tests
+
+### Changed
+
+- GUI served by the backend connects automatically — no "Check" click, backend URL field and setup instructions hidden
+- `/extract` and `/separate` no longer block the event loop (health checks and heartbeats answer during separation)
+- CREPE runs on Apple Silicon (MPS); `demucs>=4.1.0` (MPS by default, reads MP3 without ffmpeg)
+- Python 3.10+ required; `server.py` dev entry point binds to 127.0.0.1 instead of 0.0.0.0
+- CREPE is the default engine (note F1 0.59 vs 0.41 for the previous pipeline on BabySlakh)
+- Demucs runs in-process via `demucs.api` with the model cached between requests (no subprocess, no model reload)
+- Onset detection from log-RMS rise instead of spectral flux (catches repeated notes, ~5 ms instead of ~23 ms bias)
+- New dependencies: `beat_this`, `audio-separator`, `onnxruntime`, `imageio-ffmpeg`, `audioread`
+- Progress-bar stage weights depend on the separation model (BS-RoFormer ≈ half of the time, htdemucs ≈ 15 %)
+- `/extract` and `/separate` are now blocking wrappers around the same jobs
+
+### Fixed
+
+- Demucs was launched as `python` from `PATH` instead of the app's own interpreter — failed whenever the app ran from a virtualenv that wasn't activated
+- CREPE engine returned zero notes: `fmin=30 Hz` is below CREPE's lowest bin (~31.7 Hz), which made torchcrepe mask every bin (periodicity NaN)
+- Transcription step label always said "librosa pyin", even with CREPE selected
+- CREPE with `batch_size=2048` needed ~37 MB RAM per frame (~76 GB) and pushed macOS into heavy swap; now 32 (~1.6 GB peak for a full extraction), GPU cache freed after each stage, `BASSLIFT_DEVICE=cpu` override
+- Repeated notes were merged into one long note after quantization (8 eighths on E → 1 note)
+- Quantization grid was anchored at 0 s with a single BPM, so every note after a non-zero start or a slightly wrong tempo landed in the wrong place in the bar
+- BPM was limited by librosa's tempo resolution (e.g. 117/123 instead of 120) and differed between engines
+
 ## [0.3.0] - 2026-05-25
 
 Major update: neural transcription engine (CREPE) alongside librosa pyin, one-click launcher, light/dark theme switcher, expanded metronome (timbres + meter + multi-accents), and a UX pass on the settings panel.
