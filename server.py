@@ -32,9 +32,10 @@ def index():
     return FileResponse(ROOT_DIR / "web_gui.html")
 
 
-# Serwuj katalog logo/ jeśli istnieje
-if (ROOT_DIR / "logo").is_dir():
-    app.mount("/logo", StaticFiles(directory=ROOT_DIR / "logo"), name="logo")
+# Serwuj logo/ i fonts/ (czcionki lokalnie, żeby wygląd nie zależał od internetu)
+for static in ("logo", "fonts"):
+    if (ROOT_DIR / static).is_dir():
+        app.mount(f"/{static}", StaticFiles(directory=ROOT_DIR / static), name=static)
 
 VERSION = "0.3.0"
 

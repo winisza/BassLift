@@ -12,6 +12,8 @@ Local audio tool that does two things:
 
 Everything runs locally on your machine. No audio is ever uploaded to a third-party server.
 
+On a Mac with Apple Silicon it runs as a native app (**BassLift.app**); on Windows and Linux in your browser via a one-click launcher — see [Quick start](#quick-start).
+
 > **Experimental** — this is a personal project in active development. Expect rough edges, breaking changes, and quirky behavior on edge cases. Feedback and issues welcome.
 >
 > **Best on modern GPU or Apple Silicon.** Demucs separation is the heaviest step — a 3-minute song takes ~5-30 seconds on an NVIDIA GPU (CUDA) or Apple Silicon (M1/M2/M3/M4 via MPS), versus 2-4 minutes on CPU. See [GPU acceleration](#gpu-acceleration-strongly-recommended) below.
@@ -113,15 +115,36 @@ python -c "import torch; print('MPS:', torch.backends.mps.is_available())"
 
 ```bash
 git clone https://github.com/winisza/BassLift.git
+cd BassLift
 ```
 
-Then **double-click the launcher**:
+### macOS (Apple Silicon) — BassLift.app, the default
 
-- **macOS:** `BassLift.command` (if you downloaded a ZIP instead of cloning, right-click → Open the first time)
+A self-contained app with a native window: after building it you need no Python, Terminal or browser. macOS 14+.
+
+```bash
+scripts/build_macos_app.sh
+```
+
+About 2 minutes (Python 3.10+ is needed only for the build tools, ~2 GB disk in `build/`). Then open `dist/BassLift-0.4.0.dmg` (~350 MB) and drag **BassLift** into Applications. Launch it like any other app.
+
+- Models are downloaded on first use (~900 MB) into the same caches the launcher uses (`~/.cache/…`), so both share them.
+- Saving tab/MIDI/MusicXML/WAV opens a native "Save as" dialog; copy goes to the system clipboard.
+- Logs: `~/Library/Logs/BassLift/basslift.log`.
+- The app is signed ad hoc — fine on the Mac that built it. A copy moved to another Mac is blocked by Gatekeeper unless you right-click → Open (Developer ID signing and notarization are not set up).
+- The native window also runs from source: `.venv/bin/python -m basslift`.
+- Smoke test of a built app (runs an extraction through the UI, saves all exports, checks the clipboard):
+  `open -W --env BASSLIFT_SMOKETEST=/tmp/report.json build/basslift/macos/app/BassLift.app`
+
+### Windows, Linux, or without building — launcher in the browser
+
+**Double-click the launcher**:
+
 - **Windows:** `BassLift.bat`
+- **macOS:** `BassLift.command` (if you downloaded a ZIP instead of cloning, right-click → Open the first time)
 - **Linux / terminal:** `./BassLift.command` or `python run.py`
 
-That's it. The launcher:
+The launcher:
 
 1. On first run creates a private `.venv` next to the app and installs everything from `requirements.txt` (a few minutes — PyTorch is big). On NVIDIA machines it installs the CUDA build of PyTorch automatically.
 2. Starts the local server and opens BassLift in your browser.

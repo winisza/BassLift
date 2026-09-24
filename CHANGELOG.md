@@ -16,6 +16,10 @@ Ideas under consideration (no commitments):
 
 ### Added
 
+- **BassLift.app for macOS** (Apple Silicon, macOS 14+): native window (pywebview/WKWebView) with the server in-process, built with Briefcase by `scripts/build_macos_app.sh` into an ad-hoc-signed app (~1.3 GB) and DMG (~350 MB). Wheels for source-only dependencies are built locally; bytecode is precompiled so the running app never writes into its bundle
+- Native "Save as" and clipboard through a JS→Python bridge (WKWebView does not handle downloads); closing the window or Cmd+Q stops everything; fixed local port so settings persist across launches; logs in `~/Library/Logs/BassLift`
+- Fonts bundled locally (OFL) instead of Google Fonts — UI looks the same offline
+- `python -m basslift` runs the native window from source; `BASSLIFT_SMOKETEST=<report.json>` runs an end-to-end UI test inside the app
 - True one-click start: `BassLift.command` (macOS/Linux) and `BassLift.bat` (Windows) run `run.py`, which on first launch creates `.venv` and installs `requirements.txt` (CUDA PyTorch on NVIDIA machines), reuses a running instance, falls back to a free port if 8000 is taken, and opens the browser once the server is actually up
 - Auto-shutdown: the page sends heartbeats (`POST /api/heartbeat`, `POST /api/bye` on tab close); `run.py` stops the server when no BassLift tab is open and no job is running
 - `run.py --no-browser`
