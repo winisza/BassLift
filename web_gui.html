@@ -869,8 +869,8 @@
       <div class="setting-card mode-bass-only">
         <div class="setting-name" data-i18n="set_engine">Silnik transkrypcji</div>
         <select id="transcriptionEngine">
-          <option value="pyin" data-i18n="engine_pyin">librosa pyin (szybki)</option>
-          <option value="crepe" data-i18n="engine_crepe">CREPE neural (celny)</option>
+          <option value="crepe" data-i18n="engine_crepe">CREPE neural (celny, zalecany)</option>
+          <option value="pyin" data-i18n="engine_pyin">librosa pyin (szybszy)</option>
         </select>
       </div>
       <div class="setting-card mode-bass-only">
@@ -902,9 +902,10 @@
       <div class="setting-card mode-bass-only">
         <div class="setting-name" data-i18n="set_quantize">Siatka kwantyzacji</div>
         <select id="quantizeMode">
+          <option value="auto" selected data-i18n="quant_auto">Auto (1/16 lub triole)</option>
           <option value="8" data-i18n="quant_8">1/8 (ósemki)</option>
           <option value="8t" data-i18n="quant_8t">1/8T (triole ósemkowe)</option>
-          <option value="16" selected data-i18n="quant_16">1/16 (szesnastki)</option>
+          <option value="16" data-i18n="quant_16">1/16 (szesnastki)</option>
           <option value="16t" data-i18n="quant_16t">1/16T (triole szesnastkowe)</option>
         </select>
       </div>
@@ -1013,24 +1014,22 @@
   </div>
 
   <!-- Instructions -->
-  <div class="instructions">
+  <div class="instructions" id="instructions">
     <div class="instructions-header" id="instToggle">
-      <span style="color:var(--accent)">?</span> <span data-i18n="inst_header">Jak uruchomić backend lokalnie</span>
+      <span style="color:var(--accent)">?</span> <span data-i18n="inst_header">Jak uruchomić BassLift</span>
       <span id="instArrow" style="margin-left:auto">▼</span>
     </div>
     <div class="instructions-body" id="instBody">
-      <div class="inst-step"><strong data-i18n="inst_req">Wymagania:</strong> <span data-i18n="inst_req_desc">Python 3.9+, pip, ok. 4 GB RAM</span></div>
+      <div class="inst-step"><strong data-i18n="inst_req">Wymagania:</strong> <span data-i18n="inst_req_desc">Python 3.10+, ok. 4 GB RAM</span></div>
       <br>
-      <div class="inst-step"><strong>1. <span data-i18n="inst_step1">Instalacja zależności</span></strong></div>
-      <div class="code-block">pip install fastapi uvicorn python-multipart \
-    demucs librosa midiutil python-dotenv</div>
+      <div class="inst-step"><strong>1. <span data-i18n="inst_step1">Uruchom dwuklikiem</span></strong></div>
+      <div class="code-block">macOS:    BassLift.command
+Windows:  BassLift.bat
+terminal: python run.py</div>
 
-      <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Uruchomienie serwera</span></strong></div>
-      <div class="code-block">uvicorn server:app --reload --port 8000</div>
-
-      <div class="inst-step"><strong>3. <span data-i18n="inst_step3">Pobierz kod serwera</span></strong> — <span data-i18n="inst_step3_desc">plik <span style="color:var(--accent)">server.py</span> jest dostępny w repozytorium GitHub.</span></div>
+      <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Aplikacja otworzy się w przeglądarce</span></strong> — <span data-i18n="inst_step2_desc">zamknięcie karty wyłącza serwer.</span></div>
       <br>
-      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie pobiera model Demucs (~300 MB). Kolejne są szybsze.</div>
+      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie instaluje zależności (kilka minut) i pobiera model Demucs. Kolejne starty są szybkie.</div>
     </div>
   </div>
 
@@ -1071,6 +1070,8 @@ let midiBlob = null;
 let musicxmlBlob = null;
 let currentMode = 'bass';   // 'bass' | 'vocal'
 let currentLang = 'pl';
+// GUI serwowane przez backend (run.py) — adres jest znany, nie trzeba nic konfigurować
+const SERVED_BY_BACKEND = location.protocol === 'http:' || location.protocol === 'https:';
 
 // ─── i18n ───
 const I18N = {
@@ -1095,13 +1096,14 @@ const I18N = {
     set_export_midi: 'Eksportuj MIDI',
     set_export_bass: 'Pobierz izolowany bas (WAV)',
     set_quantize: 'Siatka kwantyzacji',
+    quant_auto: 'Auto (1/16 lub triole)',
     quant_8: '1/8 (ósemki)',
     quant_8t: '1/8T (triole ósemkowe)',
     quant_16: '1/16 (szesnastki)',
     quant_16t: '1/16T (triole szesnastkowe)',
     set_engine: 'Silnik transkrypcji',
-    engine_pyin: 'librosa pyin (szybki)',
-    engine_crepe: 'CREPE neural (celny)',
+    engine_pyin: 'librosa pyin (szybszy)',
+    engine_crepe: 'CREPE neural (celny, zalecany)',
     set_stem: 'Co wyciągnąć',
     stem_vocals: 'Wokal (i instrumental)',
     stem_drums: 'Perkusja (i reszta)',
@@ -1120,18 +1122,18 @@ const I18N = {
     btn_download_midi: 'Pobierz MIDI',
     btn_download_musicxml: 'Pobierz MusicXML',
     btn_download_bass: 'Pobierz bas (WAV)',
-    inst_header: 'Jak uruchomić backend lokalnie',
+    status_closed: 'BassLift został zamknięty — uruchom go ponownie',
+    inst_header: 'Jak uruchomić BassLift',
     inst_req: 'Wymagania:',
-    inst_req_desc: 'Python 3.9+, pip, ok. 4 GB RAM',
-    inst_step1: 'Instalacja zależności',
-    inst_step2: 'Uruchomienie serwera',
-    inst_step3: 'Pobierz kod serwera',
-    inst_step3_desc: 'plik server.py jest dostępny w repozytorium GitHub.',
-    inst_note: 'Pierwsze uruchomienie pobiera model Demucs (~300 MB). Dla przyspieszenia 8-15× zainstaluj PyTorch z CUDA (NVIDIA) — na Apple Silicon MPS działa od razu. Szczegóły w README.',
+    inst_req_desc: 'Python 3.10+, ok. 4 GB RAM',
+    inst_step1: 'Uruchom dwuklikiem',
+    inst_step2: 'Aplikacja otworzy się w przeglądarce',
+    inst_step2_desc: 'zamknięcie karty wyłącza serwer.',
+    inst_note: 'Pierwsze uruchomienie instaluje zależności (kilka minut) i pobiera model Demucs. Kolejne starty są szybkie. GPU NVIDIA i Apple Silicon są używane automatycznie.',
     footer: 'BassLift · działa lokalnie · dane nie opuszczają Twojego komputera',
     step_sep: 'Separacja basu (Demucs)',
     step_sep_vocal: 'Separacja źródeł (Demucs)',
-    step_midi: 'Transkrypcja audio → nuty (librosa pyin)',
+    step_midi: 'Transkrypcja audio → nuty ({x})',
     step_tab: 'Generowanie tabulatury',
     meta_bpm: 'BPM: ',
     meta_notes: 'Nuty: ',
@@ -1153,6 +1155,7 @@ const I18N = {
     name_no_drums: 'resztę (bez perkusji)',
     name_no_other: 'resztę',
     meta_timesig: 'Metrum: ',
+    meta_rec_tuning: 'Nagranie: {x} centów od A=440',
     player_input: 'Podgląd pliku wejściowego',
     player_bass: 'Izolowany bas',
     player_target: 'Odtwórz {x}',
@@ -1189,13 +1192,14 @@ const I18N = {
     set_export_midi: 'Export MIDI',
     set_export_bass: 'Download isolated bass (WAV)',
     set_quantize: 'Quantization grid',
+    quant_auto: 'Auto (1/16 or triplets)',
     quant_8: '1/8 (eighth notes)',
     quant_8t: '1/8T (eighth triplets)',
     quant_16: '1/16 (sixteenth notes)',
     quant_16t: '1/16T (sixteenth triplets)',
     set_engine: 'Transcription engine',
-    engine_pyin: 'librosa pyin (fast)',
-    engine_crepe: 'CREPE neural (accurate)',
+    engine_pyin: 'librosa pyin (faster)',
+    engine_crepe: 'CREPE neural (accurate, recommended)',
     set_stem: 'What to extract',
     stem_vocals: 'Vocals (and instrumental)',
     stem_drums: 'Drums (and the rest)',
@@ -1214,18 +1218,18 @@ const I18N = {
     btn_download_midi: 'Download MIDI',
     btn_download_musicxml: 'Download MusicXML',
     btn_download_bass: 'Download bass (WAV)',
-    inst_header: 'How to run the backend locally',
+    status_closed: 'BassLift has been closed — launch it again',
+    inst_header: 'How to run BassLift',
     inst_req: 'Requirements:',
-    inst_req_desc: 'Python 3.9+, pip, ~4 GB RAM',
-    inst_step1: 'Install dependencies',
-    inst_step2: 'Start the server',
-    inst_step3: 'Get the server code',
-    inst_step3_desc: 'the server.py file is available in the GitHub repository.',
-    inst_note: 'First run downloads the Demucs model (~300 MB). For 8-15× speedup install PyTorch with CUDA (NVIDIA) — Apple Silicon MPS works out of the box. See README for details.',
+    inst_req_desc: 'Python 3.10+, ~4 GB RAM',
+    inst_step1: 'Double-click to launch',
+    inst_step2: 'The app opens in your browser',
+    inst_step2_desc: 'closing the tab shuts the server down.',
+    inst_note: 'First run installs dependencies (a few minutes) and downloads the Demucs model. Later starts are fast. NVIDIA GPUs and Apple Silicon are used automatically.',
     footer: 'BassLift · runs locally · your data never leaves your computer',
     step_sep: 'Bass separation (Demucs)',
     step_sep_vocal: 'Source separation (Demucs)',
-    step_midi: 'Audio → notes transcription (librosa pyin)',
+    step_midi: 'Audio → notes transcription ({x})',
     step_tab: 'Generating tablature',
     meta_bpm: 'BPM: ',
     meta_notes: 'Notes: ',
@@ -1247,6 +1251,7 @@ const I18N = {
     name_no_drums: 'rest (no drums)',
     name_no_other: 'rest',
     meta_timesig: 'Time sig: ',
+    meta_rec_tuning: 'Recording: {x} cents from A=440',
     player_input: 'Input file preview',
     player_bass: 'Isolated bass',
     player_target: 'Play {x}',
@@ -1347,8 +1352,11 @@ try {
     applyTheme(savedTheme);
   }
 } catch {}
-if (location.protocol === 'http:' || location.protocol === 'https:') {
+if (SERVED_BY_BACKEND) {
   $('backendUrl').value = location.origin;
+  $('backendUrl').style.display = 'none';
+  $('checkBtn').style.display = 'none';
+  $('instructions').style.display = 'none';
 }
 applyMode();
 applyLang();
@@ -1413,13 +1421,27 @@ async function checkBackend() {
     } else { throw new Error(); }
   } catch {
     $('statusDot').className = 'status-dot err';
-    $('statusText').textContent = t('status_err');
+    $('statusText').textContent = t(SERVED_BY_BACKEND ? 'status_closed' : 'status_err');
     backendOk = false;
   }
   checkRunnable();
 }
 
 $('checkBtn').addEventListener('click', checkBackend);
+
+// Heartbeat: run.py wyłącza serwer, gdy zamkniesz ostatnią kartę BassLift
+if (SERVED_BY_BACKEND) {
+  const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const beat = () => fetch('/api/heartbeat?client=' + clientId, { method: 'POST' })
+    .then(r => { if (!r.ok) throw new Error(); if (!backendOk) checkBackend(); })
+    .catch(() => { if (backendOk) checkBackend(); });
+  checkBackend();
+  beat();
+  setInterval(beat, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) beat(); });
+  window.addEventListener('pagehide', () => navigator.sendBeacon('/api/bye?client=' + clientId));
+}
 
 $('noteThreshold').addEventListener('input', e => {
   $('thresholdVal').textContent = e.target.value;
@@ -1469,7 +1491,8 @@ function getSteps() {
   }
   return [
     { id: 'sep',  label: t('step_sep') },
-    { id: 'midi', label: t('step_midi') },
+    { id: 'midi', label: t('step_midi').replace('{x}',
+        $('transcriptionEngine').value === 'crepe' ? 'CREPE' : 'librosa pyin') },
     { id: 'tab',  label: t('step_tab') },
   ];
 }
@@ -1668,10 +1691,14 @@ function showTab(data) {
     { label: t('meta_notes') + (data.note_count || '?') },
     { label: t('meta_dur') + (data.duration || '?') + 's' },
     { label: t('meta_tuning') + (data.tuning || 'EADG') },
-    { label: t('meta_grid') + ($('quantizeMode').selectedOptions[0]?.text || '1/16') },
+    { label: t('meta_grid') + (data.grid || $('quantizeMode').selectedOptions[0]?.text || '1/16') },
   ];
   if (data.time_sig) {
     pills.push({ label: t('meta_timesig') + data.time_sig + '/4' });
+  }
+  if (Math.abs(data.tuning_cents || 0) >= 10) {
+    const c = Math.round(data.tuning_cents);
+    pills.push({ label: t('meta_rec_tuning').replace('{x}', (c > 0 ? '+' : '') + c) });
   }
   pills.forEach(p => {
     const span = document.createElement('span');
