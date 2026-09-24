@@ -27,6 +27,12 @@ Ideas under consideration (no commitments):
 - MIDI tempo map (bar by bar) and time signature; MusicXML ties across bar lines, dotted and triplet values
 - Fallback when Demucs "loses" the bass (bass < 15 % of mix energy): transcribe the low band of bass + other
 - `basslift/` package (`separation`, `rhythm`, `transcribe`, `notation`); `server.py` is HTTP only
+- Background jobs with real progress: `POST /api/jobs`, `GET /api/jobs/{id}` (stage + fraction from Demucs chunks and CREPE batches); the UI polls instead of waiting on one long request
+- Re-transcription without re-separation: `POST /api/jobs/{id}/retranscribe`; in the UI, changing threshold, grid, tuning or exports updates the tab in < 1 s, switching the engine re-runs only the pitch tracker
+- One heavy job at a time (queue) to keep RAM bounded; jobs and files expire 30 min after last use
+- Warning pill when the bass-separation fallback was used
+- **BS-RoFormer SW** as the default separation model (via `audio-separator`): note F1 on BabySlakh 0.59 → 0.71, no lost-bass songs; htdemucs stays as the fast option and as automatic fallback when `audio-separator` is unavailable. Model (~700 MB) downloaded once to `~/.cache/basslift/models`, with a "downloading" stage in the UI; progress reported per chunk
+- Bundled ffmpeg (`imageio-ffmpeg`) put on `PATH` for the separator — no system install; m4a/aac input now works
 - `eval/`: synthetic test-set generator and evaluator (mir_eval note F1, beat/downbeat F, meter, tempo) for the synthetic set and BabySlakh, with a baseline comparison mode; `tests/` unit tests
 
 ### Changed
@@ -38,7 +44,9 @@ Ideas under consideration (no commitments):
 - CREPE is the default engine (note F1 0.59 vs 0.41 for the previous pipeline on BabySlakh)
 - Demucs runs in-process via `demucs.api` with the model cached between requests (no subprocess, no model reload)
 - Onset detection from log-RMS rise instead of spectral flux (catches repeated notes, ~5 ms instead of ~23 ms bias)
-- New dependency: `beat_this`
+- New dependencies: `beat_this`, `audio-separator`, `onnxruntime`, `imageio-ffmpeg`, `audioread`
+- Progress-bar stage weights depend on the separation model (BS-RoFormer ≈ half of the time, htdemucs ≈ 15 %)
+- `/extract` and `/separate` are now blocking wrappers around the same jobs
 
 ### Fixed
 

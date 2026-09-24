@@ -6,7 +6,7 @@ Tryb deweloperski: uvicorn server:app --reload --port 8000
 Warstwa HTTP. Separacja, transkrypcja i zapis nut są w pakiecie basslift/.
 """
 
-import base64, logging, uuid, time, tempfile, threading
+import logging, shutil, time, tempfile, threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict
@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from basslift import notation, separation, transcribe as tr
+from basslift import jobs
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
 log = logging.getLogger("basslift")
@@ -42,15 +42,18 @@ ALLOWED_SUFFIXES = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac"}
 
 BASS_CACHE_DIR = Path(tempfile.gettempdir()) / "basslift_cache"
 BASS_CACHE_DIR.mkdir(exist_ok=True)
-BASS_CACHE_MAX_AGE = 600  # 10 min
+BASS_CACHE_MAX_AGE = jobs.JOB_TTL  # ścieżki muszą żyć tak długo jak zadania, które je podają
 
 
 def _cleanup_cache():
-    """Usuń pliki starsze niż BASS_CACHE_MAX_AGE."""
+    """Usuń pliki i katalogi zadań starsze niż BASS_CACHE_MAX_AGE (także po restarcie serwera)."""
     now = time.time()
     for f in BASS_CACHE_DIR.glob("*.wav"):
         if now - f.stat().st_mtime > BASS_CACHE_MAX_AGE:
             f.unlink(missing_ok=True)
+    for d in (BASS_CACHE_DIR / "jobs").glob("*/"):
+        if now - d.stat().st_mtime > BASS_CACHE_MAX_AGE and not jobs_store.in_use(d.name):
+            shutil.rmtree(d, ignore_errors=True)
 
 
 # ────────────────────────────────────────────────
@@ -97,6 +100,7 @@ class Presence:
 
 
 presence = Presence()
+jobs_store = jobs.JobStore(BASS_CACHE_DIR, busy=presence.job)
 
 
 # ────────────────────────────────────────────────
@@ -147,62 +151,94 @@ def _save_upload(file: UploadFile, tmpdir: Path) -> Path:
     return src
 
 
-def _separate(src: Path, model: str):
-    try:
-        return separation.separate(src, model)
-    except Exception as e:  # demucs.api.LoadAudioError, brak modelu itp.
-        log.exception("Separacja nie powiodła się")
-        hint = " (m4a/aac wymaga zainstalowanego ffmpeg)" if src.suffix in {".m4a", ".aac"} else ""
-        raise HTTPException(500, f"Demucs nie przetworzył pliku{hint}: {e}")
+def _submit(file: UploadFile, kind: str, params: Dict, wait: bool) -> jobs.Job:
+    _cleanup_cache()
+    with tempfile.TemporaryDirectory() as tmp:
+        return jobs_store.submit(kind, _save_upload(file, Path(tmp)), params, wait=wait)
+
+
+def _job_or_404(job_id: str) -> jobs.Job:
+    job = jobs_store.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Zadanie wygasło — uruchom je ponownie")
+    return job
+
+
+def _sync_result(job: jobs.Job) -> JSONResponse:
+    if job.state == "error":
+        raise HTTPException(500, job.error)
+    return JSONResponse(job.result)
 
 
 # ────────────────────────────────────────────────
-# Separacja wokal/instrumental — bez transkrypcji
+# Zadania w tle: postęp + ponowna transkrypcja bez separacji
+# ────────────────────────────────────────────────
+@app.post("/api/jobs")
+def create_job(
+    file: UploadFile = File(...),
+    kind: str = Form("extract"),                # extract | separate
+    demucs_model: str = Form(jobs.separation.DEFAULT_MODEL),
+    stem: str = Form("vocals"),                 # separate: vocals | bass | drums | other
+    note_threshold: int = Form(40),
+    tuning: str = Form("E,A,D,G"),
+    export_midi: str = Form("no"),
+    export_bass: str = Form("no"),
+    quantize: str = Form("auto"),               # auto | 8 | 8t | 16 | 16t
+    transcription_engine: str = Form("crepe"),  # crepe | pyin
+):
+    if kind not in {"extract", "separate"}:
+        raise HTTPException(400, f"Nieznany rodzaj zadania: {kind}")
+    if kind == "separate" and stem not in {"vocals", "bass", "drums", "other"}:
+        raise HTTPException(400, f"Nieobsługiwany stem: {stem}")
+    params = jobs.extract_params(demucs_model, note_threshold, tuning, export_midi, export_bass,
+                                 quantize, transcription_engine)
+    params["stem"] = stem
+    return {"job_id": _submit(file, kind, params, wait=False).id}
+
+
+@app.get("/api/jobs/{job_id}")
+def job_status(job_id: str):
+    return _job_or_404(job_id).public()
+
+
+@app.post("/api/jobs/{job_id}/retranscribe")
+def retranscribe(
+    job_id: str,
+    note_threshold: int = Form(40),
+    tuning: str = Form("E,A,D,G"),
+    export_midi: str = Form("no"),
+    export_bass: str = Form("no"),
+    quantize: str = Form("auto"),
+    transcription_engine: str = Form("crepe"),
+):
+    parent = _job_or_404(job_id)
+    if parent.kind != "extract" or not parent.session.analyses:
+        raise HTTPException(409, "To zadanie nie ma gotowej analizy do ponownej transkrypcji")
+    params = jobs.extract_params(parent.params["demucs_model"], note_threshold, tuning,
+                                 export_midi, export_bass, quantize, transcription_engine)
+    return {"job_id": jobs_store.retranscribe(parent, params).id}
+
+
+# ────────────────────────────────────────────────
+# Synchroniczne API (zgodność wstecz) — te same zadania, odpowiedź po zakończeniu
 # ────────────────────────────────────────────────
 @app.post("/separate")
 def separate(
     file: UploadFile = File(...),
-    demucs_model: str = Form("htdemucs"),
+    demucs_model: str = Form(jobs.separation.DEFAULT_MODEL),
     stem: str = Form("vocals"),  # vocals | bass | drums | other
 ):
     # Zwykłe `def` — FastAPI puszcza to w wątku, więc /health i heartbeat
     # odpowiadają także w trakcie kilkuminutowej separacji
     if stem not in {"vocals", "bass", "drums", "other"}:
         raise HTTPException(400, f"Nieobsługiwany stem: {stem}")
-
-    with presence.job(), tempfile.TemporaryDirectory() as _tmp:
-        src = _save_upload(file, Path(_tmp))
-        log.info("Separacja Demucs (%s) — stem=%s", demucs_model, stem)
-        sr, stems = _separate(src, demucs_model)
-        target, accomp = separation.two_stems(stems, stem)
-
-        _cleanup_cache()
-        base_id = uuid.uuid4().hex[:12]
-        accomp_label = {
-            "vocals": "instrumental",
-            "bass":   "no_bass",
-            "drums":  "no_drums",
-            "other":  "no_other",
-        }[stem]
-        target_id = f"{base_id}_{stem}"
-        accomp_id = f"{base_id}_{accomp_label}"
-        separation.save_wav(BASS_CACHE_DIR / f"{target_id}.wav", target, sr)
-        separation.save_wav(BASS_CACHE_DIR / f"{accomp_id}.wav", accomp, sr)
-
-        log.info("Gotowe! IDs: %s, %s", target_id, accomp_id)
-        return JSONResponse({
-            "target_id":      target_id,
-            "target_label":   stem,
-            "accomp_id":      accomp_id,
-            "accomp_label":   accomp_label,
-        })
+    return _sync_result(_submit(file, "separate", {"demucs_model": demucs_model, "stem": stem}, wait=True))
 
 
-# ────────────────────────────────────────────────
 @app.post("/extract")
 def extract(
     file: UploadFile = File(...),
-    demucs_model: str = Form("htdemucs"),
+    demucs_model: str = Form(jobs.separation.DEFAULT_MODEL),
     note_threshold: int = Form(40),
     tuning: str = Form("E,A,D,G"),
     export_midi: str = Form("no"),
@@ -210,53 +246,9 @@ def extract(
     quantize: str = Form("auto"),  # auto | 8 | 8t | 16 | 16t
     transcription_engine: str = Form("crepe"),  # "crepe" | "pyin"
 ):
-    with presence.job(), tempfile.TemporaryDirectory() as _tmp:
-        src = _save_upload(file, Path(_tmp))
-
-        log.info("Krok 1/3 — Demucs separacja basu (%s)", demucs_model)
-        sr, stems = _separate(src, demucs_model)
-        bass, rest = separation.two_stems(stems, "bass")
-        source, _ = separation.bass_for_transcription(stems, sr)
-
-        engine = "pyin" if transcription_engine == "pyin" else "crepe"
-        log.info("Krok 2/3 — Beaty i transkrypcja (%s)", engine)
-        try:
-            result = tr.transcribe(source, sr, mix=bass + rest, engine=engine,
-                                   slider=note_threshold, quantize_mode=quantize)
-        except RuntimeError as e:
-            raise HTTPException(500, str(e))
-        grid = result.grid
-        log.info("  Wykryto %d nut, BPM=%.1f, metrum=%d/4, strój %+.0f centów",
-                 len(result.notes), grid.bpm, grid.beats_per_bar, result.tuning_cents)
-
-        log.info("Krok 3/3 — Tabulatura, MIDI, MusicXML")
-        tuning_list = [s.strip().upper() for s in tuning.split(",")]
-        tab_str = notation.generate_tab(result.notes, grid, tuning_list, result.quantize_mode,
-                                        result.tuning_cents)
-        midi_b64 = notation.notes_to_midi_b64(result.notes, grid) if export_midi == "yes" else None
-        xml_str = notation.notes_to_musicxml(result.notes, grid)
-        musicxml_b64 = base64.b64encode(xml_str.encode("utf-8")).decode() if xml_str else None
-
-        bass_download_id = None
-        if export_bass == "yes":
-            _cleanup_cache()
-            bass_download_id = uuid.uuid4().hex[:12]
-            separation.save_wav(BASS_CACHE_DIR / f"{bass_download_id}.wav", bass, sr)
-
-        log.info("Gotowe!")
-        return JSONResponse({
-            "tab": tab_str,
-            "bpm": grid.bpm,
-            "note_count": len(result.notes),
-            "duration": round(result.duration, 1),
-            "tuning": ",".join(tuning_list),
-            "time_sig": grid.beats_per_bar,
-            "tuning_cents": result.tuning_cents,
-            "grid": notation.QUANT_LABELS.get(result.quantize_mode, "1/16"),
-            "midi_b64": midi_b64,
-            "musicxml_b64": musicxml_b64,
-            "bass_download_id": bass_download_id,
-        })
+    params = jobs.extract_params(demucs_model, note_threshold, tuning, export_midi, export_bass,
+                                 quantize, transcription_engine)
+    return _sync_result(_submit(file, "extract", params, wait=True))
 
 
 # ────────────────────────────────────────────────

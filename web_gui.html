@@ -861,7 +861,8 @@
       <div class="setting-card">
         <div class="setting-name" data-i18n="set_model">Model separacji (Demucs)</div>
         <select id="demucsModel">
-          <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (zalecany)</option>
+          <option value="bs_roformer_sw" selected data-i18n="model_roformer">BS-RoFormer SW (najcelniejszy)</option>
+          <option value="htdemucs" data-i18n="model_htdemucs">htdemucs (szybki)</option>
           <option value="htdemucs_ft" data-i18n="model_htdemucs_ft">htdemucs_ft (fine-tuned)</option>
           <option value="mdx_extra" data-i18n="model_mdx">mdx_extra (wolniejszy)</option>
         </select>
@@ -1029,7 +1030,7 @@ terminal: python run.py</div>
 
       <div class="inst-step"><strong>2. <span data-i18n="inst_step2">Aplikacja otworzy się w przeglądarce</span></strong> — <span data-i18n="inst_step2_desc">zamknięcie karty wyłącza serwer.</span></div>
       <br>
-      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie instaluje zależności (kilka minut) i pobiera model Demucs. Kolejne starty są szybkie.</div>
+      <div class="inst-step" style="color:var(--text3)" data-i18n="inst_note">Pierwsze uruchomienie instaluje zależności (kilka minut), a pierwsza ekstrakcja pobiera model separacji (~700 MB).</div>
     </div>
   </div>
 
@@ -1066,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let selectedFile = null;
 let inputObjectUrl = null;
 let tabData = null;
+let lastJobId = null;   // zadanie, którego analizę da się przeliczyć z innymi ustawieniami
 let midiBlob = null;
 let musicxmlBlob = null;
 let currentMode = 'bass';   // 'bass' | 'vocal'
@@ -1085,8 +1087,9 @@ const I18N = {
     upload_title: 'Upuść plik audio tutaj',
     upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
     sec_settings: '02 — Ustawienia',
-    set_model: 'Model separacji (Demucs)',
-    model_htdemucs: 'htdemucs (zalecany)',
+    set_model: 'Model separacji',
+    model_roformer: 'BS-RoFormer SW (najcelniejszy)',
+    model_htdemucs: 'htdemucs (szybki)',
     model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
     model_mdx: 'mdx_extra (wolniejszy)',
     set_threshold: 'Próg pewności detekcji',
@@ -1129,12 +1132,17 @@ const I18N = {
     inst_step1: 'Uruchom dwuklikiem',
     inst_step2: 'Aplikacja otworzy się w przeglądarce',
     inst_step2_desc: 'zamknięcie karty wyłącza serwer.',
-    inst_note: 'Pierwsze uruchomienie instaluje zależności (kilka minut) i pobiera model Demucs. Kolejne starty są szybkie. GPU NVIDIA i Apple Silicon są używane automatycznie.',
+    inst_note: 'Pierwsze uruchomienie instaluje zależności (kilka minut), a pierwsza ekstrakcja pobiera model separacji (~700 MB). Kolejne starty są szybkie. GPU NVIDIA i Apple Silicon są używane automatycznie.',
     footer: 'BassLift · działa lokalnie · dane nie opuszczają Twojego komputera',
-    step_sep: 'Separacja basu (Demucs)',
-    step_sep_vocal: 'Separacja źródeł (Demucs)',
+    step_sep: 'Separacja basu ({x})',
+    step_sep_vocal: 'Separacja źródeł ({x})',
     step_midi: 'Transkrypcja audio → nuty ({x})',
     step_tab: 'Generowanie tabulatury',
+    step_queued: 'czeka w kolejce',
+    step_download: 'pobieranie modelu (~700 MB, tylko za pierwszym razem)',
+    meta_sep_fallback: '⚠ BS-RoFormer niedostępny — użyto htdemucs',
+    step_uploading: 'wysyłanie pliku',
+    meta_fallback: '⚠ bas słabo wydzielony — wynik mniej pewny',
     meta_bpm: 'BPM: ',
     meta_notes: 'Nuty: ',
     meta_dur: 'Czas: ',
@@ -1181,8 +1189,9 @@ const I18N = {
     upload_title: 'Drop your audio file here',
     upload_sub: 'MP3, WAV, FLAC, OGG · max 50 MB',
     sec_settings: '02 — Settings',
-    set_model: 'Separation model (Demucs)',
-    model_htdemucs: 'htdemucs (recommended)',
+    set_model: 'Separation model',
+    model_roformer: 'BS-RoFormer SW (most accurate)',
+    model_htdemucs: 'htdemucs (fast)',
     model_htdemucs_ft: 'htdemucs_ft (fine-tuned)',
     model_mdx: 'mdx_extra (slower)',
     set_threshold: 'Detection confidence threshold',
@@ -1225,12 +1234,17 @@ const I18N = {
     inst_step1: 'Double-click to launch',
     inst_step2: 'The app opens in your browser',
     inst_step2_desc: 'closing the tab shuts the server down.',
-    inst_note: 'First run installs dependencies (a few minutes) and downloads the Demucs model. Later starts are fast. NVIDIA GPUs and Apple Silicon are used automatically.',
+    inst_note: 'First run installs dependencies (a few minutes); the first extraction downloads the separation model (~700 MB). Later starts are fast. NVIDIA GPUs and Apple Silicon are used automatically.',
     footer: 'BassLift · runs locally · your data never leaves your computer',
-    step_sep: 'Bass separation (Demucs)',
-    step_sep_vocal: 'Source separation (Demucs)',
+    step_sep: 'Bass separation ({x})',
+    step_sep_vocal: 'Source separation ({x})',
     step_midi: 'Audio → notes transcription ({x})',
     step_tab: 'Generating tablature',
+    step_queued: 'queued',
+    step_download: 'downloading the model (~700 MB, first run only)',
+    meta_sep_fallback: '⚠ BS-RoFormer unavailable — used htdemucs',
+    step_uploading: 'uploading',
+    meta_fallback: '⚠ bass poorly separated — less reliable',
     meta_bpm: 'BPM: ',
     meta_notes: 'Notes: ',
     meta_dur: 'Duration: ',
@@ -1328,6 +1342,7 @@ function applyMode() {
     el.style.display = isBass ? 'none' : '';
   });
   // Hide tab output if mode changes
+  lastJobId = null;
   stopAllAudio();
   $('tabOutput').classList.remove('show');
   applyLang();
@@ -1380,6 +1395,7 @@ uploadArea.addEventListener('drop', e => {
 
 function setFile(f) {
   selectedFile = f;
+  lastJobId = null;
   $('fileName').textContent = f.name;
   $('fileSize').textContent = (f.size / 1048576).toFixed(2) + ' MB';
   uploadArea.style.display = 'none';
@@ -1394,6 +1410,7 @@ function setFile(f) {
 $('fileRemove').addEventListener('click', () => {
   stopAllAudio();
   selectedFile = null;
+  lastJobId = null;
   fileInput.value = '';
   uploadArea.style.display = '';
   fileChosen.classList.remove('show');
@@ -1486,18 +1503,19 @@ try {
 
 // Steps
 function getSteps() {
+  const model = $('demucsModel').value === 'bs_roformer_sw' ? 'BS-RoFormer' : 'Demucs';
   if (currentMode === 'vocal') {
-    return [{ id: 'sep', label: t('step_sep_vocal') }];
+    return [{ id: 'sep', label: t('step_sep_vocal').replace('{x}', model) }];
   }
   return [
-    { id: 'sep',  label: t('step_sep') },
+    { id: 'sep',  label: t('step_sep').replace('{x}', model) },
     { id: 'midi', label: t('step_midi').replace('{x}',
         $('transcriptionEngine').value === 'crepe' ? 'CREPE' : 'librosa pyin') },
     { id: 'tab',  label: t('step_tab') },
   ];
 }
 
-function renderSteps(activeId, doneIds = [], errId = null) {
+function renderSteps(activeId, doneIds = [], errId = null, note = '') {
   const list = $('stepList');
   list.innerHTML = '';
   getSteps().forEach(s => {
@@ -1517,7 +1535,7 @@ function renderSteps(activeId, doneIds = [], errId = null) {
       div.appendChild(icon);
     }
     const lbl = document.createElement('span');
-    lbl.textContent = s.label;
+    lbl.textContent = s.label + (active && note ? ' · ' + note : '');
     div.appendChild(lbl);
     list.appendChild(div);
   });
@@ -1525,6 +1543,65 @@ function renderSteps(activeId, doneIds = [], errId = null) {
 
 function setProgress(pct) {
   $('progressBar').style.width = pct + '%';
+}
+
+// Etap zadania na serwerze -> krok na liście
+const STAGE_STEP = { queued: 'sep', download: 'sep', separation: 'sep', saving: 'sep',
+                     beats: 'midi', pitch: 'midi', notation: 'tab' };
+const STEP_ORDER = ['sep', 'midi', 'tab'];
+
+function showJobProgress(job, alreadyDone = []) {
+  let step = STAGE_STEP[job.stage] || 'sep';
+  while (alreadyDone.includes(step) && step !== 'tab') step = STEP_ORDER[STEP_ORDER.indexOf(step) + 1];
+  const done = [...new Set([...alreadyDone, ...STEP_ORDER.slice(0, STEP_ORDER.indexOf(step))])];
+  // librosa.pyin nie raportuje postępu — sam etap zamiast zamrożonego „0%”
+  const silent = job.stage === 'pitch' && $('transcriptionEngine').value === 'pyin';
+  const note = job.state === 'queued' ? t('step_queued')
+    : job.stage === 'download' ? t('step_download')
+    : silent ? '' : Math.round(job.progress * 100) + '%';
+  renderSteps(step, done, null, note);
+  setProgress(Math.max(2, job.progress * 100));
+}
+
+async function finishProgress(done, pause = 250) {
+  renderSteps(null, done);
+  setProgress(100);
+  if (pause) await delay(pause);
+  $('progressArea').classList.remove('show');
+  setProgress(0);
+}
+
+async function apiJson(res) {
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
+    const e = new Error(err.detail || 'HTTP ' + res.status);
+    e.status = res.status;
+    throw e;
+  }
+  return res.json();
+}
+
+// Odpytuje zadanie do końca: postęp na żywo, zwraca wynik albo rzuca błąd
+async function pollJob(url, jobId, alreadyDone = []) {
+  for (let attempt = 0; ; attempt++) {
+    const job = await apiJson(await fetch(url + '/api/jobs/' + jobId));
+    if (job.state === 'done') return job.result;
+    if (job.state === 'error') throw new Error(job.error || t('err_unknown'));
+    showJobProgress(job, alreadyDone);
+    await delay(attempt < 5 ? 80 : 400);  // szybkie przeliczenia kończą się w ułamku sekundy
+  }
+}
+
+// Ustawienia, które można zmienić po ekstrakcji bez ponownej separacji
+function settingsForm() {
+  const fd = new FormData();
+  fd.append('note_threshold', $('noteThreshold').value);
+  fd.append('tuning', [$('t1'), $('t2'), $('t3'), $('t4')].map(i => i.value.toUpperCase()).join(','));
+  fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
+  fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
+  fd.append('quantize', $('quantizeMode').value);
+  fd.append('transcription_engine', $('transcriptionEngine').value);
+  return fd;
 }
 
 // Run
@@ -1559,41 +1636,20 @@ $('runBtn').addEventListener('click', async () => {
 });
 
 async function runBassExtract(url) {
-  const fd = new FormData();
+  const fd = settingsForm();
   fd.append('file', selectedFile);
+  fd.append('kind', 'extract');
   fd.append('demucs_model', $('demucsModel').value);
-  fd.append('note_threshold', $('noteThreshold').value);
-  fd.append('tuning', [$('t1'), $('t2'), $('t3'), $('t4')].map(i => i.value.toUpperCase()).join(','));
-  fd.append('export_midi', $('exportMidi').checked ? 'yes' : 'no');
-  fd.append('export_bass', $('exportBass').checked ? 'yes' : 'no');
-  fd.append('quantize', $('quantizeMode').value);
-  fd.append('transcription_engine', $('transcriptionEngine').value);
-
-  renderSteps('sep', []);
-  setProgress(5);
+  lastJobId = null;
+  renderSteps('sep', [], null, t('step_uploading'));
+  setProgress(1);
 
   try {
-    const res = await fetch(url + '/extract', { method: 'POST', body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
-      throw new Error(err.detail || 'HTTP ' + res.status);
-    }
-    renderSteps('midi', ['sep']);
-    setProgress(50);
-    await delay(300);
-    renderSteps('tab', ['sep', 'midi']);
-    setProgress(85);
-    await delay(300);
-
-    const data = await res.json();
-    renderSteps(null, ['sep', 'midi', 'tab']);
-    setProgress(100);
-    tabData = data.tab;
-    await delay(400);
-
+    const { job_id } = await apiJson(await fetch(url + '/api/jobs', { method: 'POST', body: fd }));
+    const data = await pollJob(url, job_id);
+    await finishProgress(['sep', 'midi', 'tab']);
+    lastJobId = data.job_id;
     showTab(data);
-    $('progressArea').classList.remove('show');
-    $('progressBar').style.width = '0%';
   } catch (e) {
     renderSteps(null, [], 'sep');
     showError(t('err_prefix') + e.message);
@@ -1603,31 +1659,62 @@ async function runBassExtract(url) {
 async function runVocalSplit(url) {
   const fd = new FormData();
   fd.append('file', selectedFile);
+  fd.append('kind', 'separate');
   fd.append('demucs_model', $('demucsModel').value);
   fd.append('stem', $('stemSelect').value);
-
-  renderSteps('sep', []);
-  setProgress(10);
+  renderSteps('sep', [], null, t('step_uploading'));
+  setProgress(1);
 
   try {
-    const res = await fetch(url + '/separate', { method: 'POST', body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: t('err_unknown') }));
-      throw new Error(err.detail || 'HTTP ' + res.status);
-    }
-    setProgress(90);
-    const data = await res.json();
-    renderSteps(null, ['sep']);
-    setProgress(100);
-    await delay(400);
+    const { job_id } = await apiJson(await fetch(url + '/api/jobs', { method: 'POST', body: fd }));
+    const data = await pollJob(url, job_id);
+    await finishProgress(['sep']);
     showSplit(data, url);
-    $('progressArea').classList.remove('show');
-    $('progressBar').style.width = '0%';
   } catch (e) {
     renderSteps(null, [], 'sep');
     showError(t('err_prefix') + e.message);
   }
 }
+
+// Zmiana ustawień po ekstrakcji: przelicz z analizy zapamiętanej na serwerze
+// (próg, siatka, strój — ułamek sekundy; inny silnik — tylko nowy tor wysokości)
+let retranscribeTimer = null;
+let retranscribeRunning = false;
+let retranscribePending = false;
+
+function scheduleRetranscribe() {
+  if (!lastJobId || currentMode !== 'bass' || !$('tabOutput').classList.contains('show')) return;
+  clearTimeout(retranscribeTimer);
+  retranscribeTimer = setTimeout(runRetranscribe, 150);
+}
+
+async function runRetranscribe() {
+  if (retranscribeRunning) { retranscribePending = true; return; }
+  retranscribeRunning = true;
+  const url = $('backendUrl').value.trim();
+  showError('');
+  $('progressArea').classList.add('show');
+  $('runBtn').disabled = true;
+  try {
+    const res = await fetch(url + '/api/jobs/' + lastJobId + '/retranscribe', { method: 'POST', body: settingsForm() });
+    const { job_id } = await apiJson(res);
+    const data = await pollJob(url, job_id, ['sep']);
+    await finishProgress(['sep', 'midi', 'tab'], 0);
+    lastJobId = data.job_id;
+    showTab(data);
+  } catch (e) {
+    $('progressArea').classList.remove('show');
+    if (e.status === 404) lastJobId = null;
+    showError(t('err_prefix') + e.message);
+  }
+  retranscribeRunning = false;
+  $('runBtn').disabled = false;
+  checkRunnable();
+  if (retranscribePending) { retranscribePending = false; runRetranscribe(); }
+}
+
+['noteThreshold', 'quantizeMode', 't1', 't2', 't3', 't4', 'transcriptionEngine', 'exportMidi', 'exportBass']
+  .forEach(id => $(id).addEventListener('change', scheduleRetranscribe));
 
 function showSplit(data, backendUrl) {
   // Meta pills: stem name + accompaniment
@@ -1700,6 +1787,12 @@ function showTab(data) {
     const c = Math.round(data.tuning_cents);
     pills.push({ label: t('meta_rec_tuning').replace('{x}', (c > 0 ? '+' : '') + c) });
   }
+  if (data.separation_fallback) {
+    pills.push({ label: t('meta_fallback') });
+  }
+  if (data.separation_model && data.separation_model !== $('demucsModel').value) {
+    pills.push({ label: t('meta_sep_fallback') });
+  }
   pills.forEach(p => {
     const span = document.createElement('span');
     span.className = 'meta-pill' + (p.hi ? ' hi' : '');
@@ -1711,6 +1804,9 @@ function showTab(data) {
   $('tabPre').textContent = data.tab || '— brak danych —';
   $('tabOutput').classList.add('show');
 
+  tabData = data.tab;
+  midiBlob = null;
+  $('downloadMidiBtn').style.display = 'none';
   if (data.midi_b64) {
     const bytes = atob(data.midi_b64);
     const arr = new Uint8Array(bytes.length);
@@ -1719,6 +1815,8 @@ function showTab(data) {
     $('downloadMidiBtn').style.display = '';
   }
 
+  musicxmlBlob = null;
+  $('downloadMusicXmlBtn').style.display = 'none';
   if (data.musicxml_b64) {
     const bytes = atob(data.musicxml_b64);
     const arr = new Uint8Array(bytes.length);
@@ -1727,12 +1825,15 @@ function showTab(data) {
     $('downloadMusicXmlBtn').style.display = '';
   }
 
+  $('downloadBassBtn').style.display = data.bass_download_id ? '' : 'none';
+  $('outputPlayerBass').classList.toggle('show', !!data.bass_download_id);
   if (data.bass_download_id) {
     $('downloadBassBtn').dataset.id = data.bass_download_id;
-    $('downloadBassBtn').style.display = '';
     const bassUrl = $('backendUrl').value.trim() + '/bass/' + data.bass_download_id;
-    $('outputAudioBass').src = bassUrl;
-    $('outputPlayerBass').classList.add('show');
+    // ten sam plik po ponownej transkrypcji — nie przerywaj odtwarzania
+    if (!$('outputAudioBass').src.endsWith('/bass/' + data.bass_download_id)) {
+      $('outputAudioBass').src = bassUrl;
+    }
   }
 
   // Auto-fill metronome BPM from extraction

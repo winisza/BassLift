@@ -8,9 +8,11 @@ początek (pyin ~90 ms) i nie widzi powtórzeń tego samego dźwięku. Dlatego:
   4. wysokość = mediana po ataku, z poprawką na odstrojenie całego nagrania.
 """
 import copy
+import dataclasses
 import logging
+import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -30,6 +32,9 @@ MIN_NOTE = 0.05           # s — krótsze segmenty to artefakty
 MAX_GAP = 0.06            # s — dziura bez tonu, którą jeszcze sklejamy w jedną nutę
 SETTLE = 0.02             # s — atak pomijany przy liczeniu wysokości
 ONSET_HOP = 256           # przy 22050 Hz = 11.6 ms
+CREPE_BATCH = 32          # ~37 MB RAM na klatkę w batchu (im2col drugiej warstwy): 32 ≈ 1.6 GB
+
+Progress = Optional[Callable[[float], None]]  # ułamek 0..1 bieżącego etapu
 
 
 @dataclass
@@ -39,6 +44,14 @@ class PitchTrack:
     confidence: np.ndarray   # voiced prob (pyin) / periodicity (CREPE), 0..1
     threshold: float         # próg pewności wybrany suwakiem
     latency: float           # jak bardzo tracker spóźnia początek nuty [s]
+    engine: str = "crepe"    # żeby zmiana suwaka umiała przeliczyć próg
+
+
+def slider_threshold(engine: str, slider: int) -> float:
+    """Suwak 0..127 -> próg voiced prob (pyin) / periodicity (CREPE)."""
+    if engine == "pyin":
+        return 0.10 + slider / 127 * 0.50
+    return 0.21 + slider / 127 * 0.30
 
 
 @dataclass
@@ -54,7 +67,7 @@ class Transcription:
 # ────────────────────────────────────────────────
 # Tory wysokości
 # ────────────────────────────────────────────────
-def track_pitch_crepe(y: np.ndarray, sr: int, slider: int) -> PitchTrack:
+def track_pitch_crepe(y: np.ndarray, sr: int, slider: int, progress: Progress = None) -> PitchTrack:
     import librosa
     try:
         import torch
@@ -66,31 +79,44 @@ def track_pitch_crepe(y: np.ndarray, sr: int, slider: int) -> PitchTrack:
 
     y16 = librosa.resample(y, orig_sr=sr, target_sr=16000) if sr != 16000 else y
     hop = 160  # 10 ms
-    # ~37 MB RAM na klatkę w batchu (im2col drugiej warstwy): 32 ≈ 1.6 GB, 2048 ≈ 76 GB
+    # Ta sama pętla co torchcrepe.predict (dekodowanie też jest per batch), ale z postępem
+    audio = torch.tensor(y16, dtype=torch.float32).unsqueeze(0)
+    device = torch_device()
+    n_batches = max(1, math.ceil((1 + len(y16) // hop) / CREPE_BATCH))
+    f0s, pers = [], []
     try:
-        f0, per = torchcrepe.predict(
-            torch.tensor(y16, dtype=torch.float32).unsqueeze(0), 16000,
-            hop_length=hop, fmin=CREPE_FREQ_MIN, fmax=BASS_FREQ_MAX, model="full",
-            return_periodicity=True, device=torch_device(), batch_size=32, pad=True)
+        with torch.no_grad():
+            for i, frames in enumerate(torchcrepe.preprocess(audio, 16000, hop, CREPE_BATCH, device, pad=True)):
+                probs = torchcrepe.infer(frames, "full", device)
+                probs = probs.reshape(1, -1, torchcrepe.PITCH_BINS).transpose(1, 2)
+                f0_b, per_b = torchcrepe.postprocess(probs, CREPE_FREQ_MIN, BASS_FREQ_MAX,
+                                                     torchcrepe.decode.viterbi, False, True)
+                f0s.append(f0_b.cpu())
+                pers.append(per_b.cpu())
+                if progress:
+                    progress(min(1.0, (i + 1) / n_batches))
     finally:
         free_gpu_memory()
+    f0, per = torch.cat(f0s, 1), torch.cat(pers, 1)
     per = torchcrepe.filter.median(per, 3)
     f0 = f0.squeeze(0).cpu().numpy()
     per = np.nan_to_num(per.squeeze(0).cpu().numpy())
-    return PitchTrack(times=np.arange(len(f0)) * hop / 16000, midi=_hz_to_midi(f0),
-                      confidence=per, threshold=0.21 + slider / 127 * 0.30, latency=0.05)
+    return PitchTrack(times=np.arange(len(f0)) * hop / 16000, midi=_hz_to_midi(f0), confidence=per,
+                      threshold=slider_threshold("crepe", slider), latency=0.05, engine="crepe")
 
 
-def track_pitch_pyin(y: np.ndarray, sr: int, slider: int) -> PitchTrack:
+def track_pitch_pyin(y: np.ndarray, sr: int, slider: int, progress: Progress = None) -> PitchTrack:
     import librosa
     y22 = librosa.resample(y, orig_sr=sr, target_sr=22050) if sr != 22050 else y
     hop = 512
     f0, voiced, prob = librosa.pyin(y22, fmin=PYIN_FREQ_MIN, fmax=BASS_FREQ_MAX, sr=22050,
                                     hop_length=hop, frame_length=4096)
     prob = np.where(voiced, np.nan_to_num(prob), 0.0)
+    if progress:
+        progress(1.0)  # librosa.pyin nie raportuje postępu
     return PitchTrack(times=librosa.times_like(f0, sr=22050, hop_length=hop),
                       midi=_hz_to_midi(f0), confidence=prob,
-                      threshold=0.10 + slider / 127 * 0.50, latency=0.14)
+                      threshold=slider_threshold("pyin", slider), latency=0.14, engine="pyin")
 
 
 def _hz_to_midi(f0):
@@ -251,22 +277,34 @@ class Analysis:
 
 def analyze(bass: np.ndarray, sr: int, mix: Optional[np.ndarray] = None,
             engine: str = "crepe", slider: int = 40,
-            grid: Optional[BeatGrid] = None, track: Optional[PitchTrack] = None) -> Analysis:
-    """`grid` / `track` można podać z cache (ewaluacja) — pozostałe kroki są tanie."""
+            grid: Optional[BeatGrid] = None, track: Optional[PitchTrack] = None,
+            on_stage: Optional[Callable[[str, float], None]] = None) -> Analysis:
+    """`grid` / `track` można podać z cache (ewaluacja, ponowna transkrypcja) — reszta jest
+    tania. `on_stage(etap, ułamek)` raportuje postęp etapów "beats" i "pitch"."""
     import librosa
+    report = on_stage or (lambda stage, frac: None)
     y = to_mono(bass)
     duration = len(y) / sr
 
     if grid is None:
+        report("beats", 0.0)
         grid = track_beats(to_mono(mix if mix is not None else bass), sr, duration)
     log.info("  Beaty: %.1f BPM, metrum %d/4", grid.bpm, grid.beats_per_bar)
 
     if track is None:
-        track = (track_pitch_pyin if engine == "pyin" else track_pitch_crepe)(y, sr, slider)
+        report("pitch", 0.0)
+        tracker = track_pitch_pyin if engine == "pyin" else track_pitch_crepe
+        track = tracker(y, sr, slider, progress=lambda f: report("pitch", f))
     y22 = librosa.resample(y, orig_sr=sr, target_sr=22050) if sr != 22050 else y
     onsets, strength = detect_onsets(y22)
     rms_t, rms = rms_envelope(y22)
     return Analysis(grid, track, onsets, strength, rms_t, rms, duration)
+
+
+def with_slider(a: Analysis, slider: int) -> Analysis:
+    """Ta sama analiza z innym progiem pewności — bez ponownego liczenia wysokości."""
+    track = dataclasses.replace(a.track, threshold=slider_threshold(a.track.engine, slider))
+    return dataclasses.replace(a, track=track)
 
 
 def finish(a: Analysis, quantize_mode: str = "auto") -> Transcription:
